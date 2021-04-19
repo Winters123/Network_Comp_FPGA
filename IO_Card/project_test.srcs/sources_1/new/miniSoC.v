@@ -22,7 +22,18 @@ module miniSoC (
 // HDMI
 
 // MAC
+	//input port
+	input		[7:0]			m_axis_rx_tdata			,//send packet
+	input						m_axis_rx_tvalid		,//send valid
+	input						m_axis_rx_tlast			,//send valid write
+	input						m_axis_rx_tuser			,//receive allmostfull	
 
+	//output port			
+	output	wire	[7:0]		s_axis_tx_tdata	    			,//send packet
+	output	wire				s_axis_tx_tvalid	    		,//send write
+	output	wire				s_axis_tx_tlast	    			,//send valid
+	output	wire				s_axis_tx_tuser    				,//send valid write
+	input						s_axis_tx_tready			 	//receive allmostfull		
 // MAC
 );
     
