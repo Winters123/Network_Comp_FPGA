@@ -14,23 +14,6 @@ module i2c_config(
 );
 
 
-// i2c_config i2c_config_m0
-// (
-// .rst                            (~cpuresetn               ),
-// .clk                            (clk_50m                  ),
-// .clk_div_cnt                    (16'd99                   ),
-// .i2c_addr_2byte                 (1'b1                     ),
-// .lut_index                      (lut_index                ),
-// .lut_dev_addr                   (lut_data[31:24]          ),
-// .lut_reg_addr                   (lut_data[23:8]           ),
-// .lut_reg_data                   (lut_data[7:0]            ),
-// .error                          (                         ),
-// .done                           (                         ),
-// .i2c_scl                        (cmos_scl                 ),
-// .i2c_sda                        (cmos_sda                 )
-// );
-
-
 wire scl_pad_i;
 wire scl_pad_o;
 wire scl_padoen_o;
@@ -56,14 +39,13 @@ wire[7:0] i2c_read_data;
 wire err;
 reg[2:0] state;
 
+
 localparam S_IDLE                =  0;
 localparam S_WR_I2C_CHECK        =  1;
 localparam S_WR_I2C              =  2;
 localparam S_WR_I2C_DONE         =  3;
 
-
 assign done = (state == S_WR_I2C_DONE);
-// assign done = 1;			// for test
 assign i2c_slave_dev_addr  = lut_dev_addr;
 assign i2c_slave_reg_addr = lut_reg_addr;
 assign i2c_write_data  = lut_reg_data;

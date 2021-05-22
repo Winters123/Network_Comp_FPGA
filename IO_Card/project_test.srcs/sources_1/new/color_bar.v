@@ -68,6 +68,7 @@ parameter HS_POL = 1'b0;
 parameter VS_POL = 1'b0;
 `endif
 
+////////////////////////////////////////////this is what we want/////////////////////
 //640x480 25.175Mhz
 `ifdef  VIDEO_640_480
 parameter H_ACTIVE = 16'd640; 

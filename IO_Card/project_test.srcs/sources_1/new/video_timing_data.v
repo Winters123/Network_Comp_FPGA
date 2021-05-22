@@ -41,7 +41,7 @@ module video_timing_data
 	output                      hs,                 // horizontal synchronization
 	output                      vs,                 // vertical synchronization
 	output                      de,                 // video valid
-	output[DATA_WIDTH - 1:0]    vout_data           // video data
+	output reg [DATA_WIDTH - 1:0]    vout_data           // video data
 );
 wire                   video_hs;
 wire                   video_vs;
@@ -59,7 +59,15 @@ assign read_en = video_de;
 assign hs = video_hs_d1;
 assign vs = video_vs_d1;
 assign de = video_de_d1;
-assign vout_data = vout_data_r;
+always @(posedge video_clk or posedge rst) begin
+	if(rst == 1'b1)begin
+		vout_data = 'd0;
+	end
+	else begin
+		vout_data <= vout_data_r;
+	end
+end
+// assign vout_data = vout_data_r;
 always@(posedge video_clk or posedge rst)
 begin
 	if(rst == 1'b1)

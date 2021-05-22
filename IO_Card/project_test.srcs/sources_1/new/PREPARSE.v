@@ -38,7 +38,7 @@ module PREPARSE
 //=========================================== Output data pkt  ==========================================//
 ,output     reg     [519:0]     o_dpkt_data                     //[519:518]:10 head \ 00 body \ 01 tail\,[517:512]:invalid bytes,[511:0],data
 ,output     reg                 o_dpkt_data_en                  //data enable
-,output     reg     [255:0]     o_dpkt_meta                     //metadata
+,output     reg     [111:0]     o_dpkt_meta                     //metadata
 ,output     reg                 o_dpkt_meta_en                  //meta enable
 ,input      wire                i_dpkt_fifo_alf                 //fifo almostfull
 
@@ -126,7 +126,7 @@ always @(posedge i_sys_clk or negedge i_sys_rst_n)begin
     if(!i_sys_rst_n) begin
         o_dpkt_data        	<=  520'b0   		;
         o_dpkt_data_en     	<=  1'b0     		;
-        o_dpkt_meta        	<=  256'b0   		;
+        o_dpkt_meta        	<=  112'b0   		;
         o_dpkt_meta_en     	<=  1'b0     		;
 
         o_cpkt_data      	<=  520'b0          ;
@@ -148,7 +148,7 @@ always @(posedge i_sys_clk or negedge i_sys_rst_n)begin
             IDLE_PREPARSE:begin
                 o_dpkt_data    		<=  520'b0          ;
                 o_dpkt_data_en 		<=  1'b0            ;
-                o_dpkt_meta    		<=  256'b0          ;
+                o_dpkt_meta    		<=  112'b0          ;
                 o_dpkt_meta_en 		<=  1'b0            ;
 
                 o_cpkt_data      	<=  520'b0          ;
@@ -166,7 +166,7 @@ always @(posedge i_sys_clk or negedge i_sys_rst_n)begin
                 end
                 else begin
                     //info fifo is not empty, however, (the next frame is a data frame,but the dpkt_fifo is almostfull )  ||(the next frame is a control frame,but the cpkt_fifo is almostfull),so discard ...
-                    if(((i_dpkt_fifo_alf == 1'b1) && (w_ari_data_q[415:400] != 16'h9001)) || ((i_cpkt_fifo_alf == 1'b1) && (w_ari_data_q[415:400] == 16'h9001)))begin
+                    if(((i_dpkt_fifo_alf == 1'b1) && (w_ari_data_q[383:368] != 16'h9001)) || ((i_cpkt_fifo_alf == 1'b1) && (w_ari_data_q[383:368] == 16'h9001)))begin
                         r_ari_data_rd       <=  1'b1            ;
                         r_ari_info_rd       <=  1'b1            ;
                         r_preparse_cs       <=  DISC_PREPARSE   ;
@@ -181,62 +181,12 @@ always @(posedge i_sys_clk or negedge i_sys_rst_n)begin
             end
             FIRST_PREPARSE:begin
                 r_first_flag        <=  1'b1                ;	// the sop flag of frame
-                case(w_ari_data_q[415:400])	//the Type of frame
-                    16'h9000:begin	//type == 0x9000:data frame(NACP + Metadata)
-                        o_dpkt_data[519:518] <=  w_ari_data_q[519:518]               ;
-                        o_dpkt_data[517:512] <=  w_ari_data_q[517:512] + 6'h2e       ;			//the invalid bytes + 46B
-                        o_dpkt_data[511:368] <=  w_ari_data_q[143:0]                 ;			//transmit the left 18B of the frame
-                        o_dpkt_data[367:0]   <=  368'b0                              ;
-
-                        o_dpkt_meta[255:192] <=  w_ari_data_q[269] ? w_ari_data_q[399:336] : w_ari_info_q[95:32]	;	//AC[9](TSM replace disable) ? original timestamp in meta : the current timestamp of frame
-						o_dpkt_meta[191:160] <=  w_ari_data_q[335:304]               ;			//UD
-						o_dpkt_meta[159:144] <=  w_ari_data_q[303:288]               ;			//type in meta
-						o_dpkt_meta[143:136] <=  w_ari_data_q[287:280]               ;			//DMID
-						o_dpkt_meta[135:128] <=  w_ari_data_q[279:272]               ;			//SMID
-						o_dpkt_meta[127:112] <=  w_ari_data_q[271:256]               ;			//AC
-						o_dpkt_meta[111:107] <=  w_ari_data_q[255:251]               ;			//ctrl:rev
-						o_dpkt_meta[106] 	 <= (w_ari_info_q[109: 96] > 14'h2e) ? 1'b0 : 1'b1; //ctrl:parse error flag（PL <= 46B）
-						o_dpkt_meta[105:104] <=  2'h0               				 ;			//ctrl:NACP data frame flag
-						o_dpkt_meta[103: 88] <=  w_ari_data_q[247:232]               ;			//FID
-						o_dpkt_meta[ 87: 80] <=  w_ari_data_q[231:224]               ;			//Priority
-						o_dpkt_meta[ 79: 78] <=  w_ari_data_q[223:222]               ;			//PL:rev
-						o_dpkt_meta[ 77: 64] <=  w_ari_info_q[109: 96] - 14'h2e		 ;			//PL:Pkt_len
-						o_dpkt_meta[ 63: 32] <=  w_ari_data_q[207:176]               ;			//OutportBM
-						o_dpkt_meta[ 31:  0] <=  w_ari_info_q[ 31:  0]               ;			//InportBM
-
-                        o_cpkt_data     	 <=  520'b0                              ;
-                        o_cpkt_data_en  	 <=  1'b0                                ;
-                        o_cpkt_meta     	 <=  256'b0                              ;
-                        o_cpkt_meta_en  	 <=  1'b0                                ;
-
-                        if(w_ari_data_q[518])begin	//the end of frame(frame <= 64B),transmit current data & meta ...
-                            o_dpkt_data_en       <=  1'b1                ;			//transmit the frame data
-                            o_dpkt_meta_en       <=  1'b1                ;			//transmit the frame meta
-                            if(i_dpkt_fifo_alf | i_cpkt_fifo_alf | w_ari_info_rdalempty)begin	//the dpkt_fifo or cpkt_fifo is almostfull or the info_fifo is alempty,go to wait ...
-                                r_preparse_cs       <=  IDLE_PREPARSE       ;
-                                r_ari_data_rd       <=  1'b0                ;
-                                r_ari_info_rd       <=  1'b0                ;
-                            end
-                            else begin	//reading the info&data fifo for next frame &  ready to parse and transmit ...
-                                r_preparse_cs       <=  FIRST_PREPARSE      ;
-                                r_ari_data_rd       <=  1'b1                ;
-                                r_ari_info_rd       <=  1'b1                ;
-                            end
-                        end
-                        else begin	// frame > 64B, reading the data fifo for current frame, and go to transmit the rest of frame data ...
-                            o_dpkt_data_en       <=  1'b0                ;
-                            o_dpkt_meta_en       <=  1'b0                ;
-
-                            r_ari_data_rd       <=  1'b1                ;
-                            r_ari_info_rd       <=  1'b0                ;
-                            r_preparse_cs       <=  NACPD_PREPARSE      ;
-                        end
-                    end
+                case(w_ari_data_q[383:368])	//the Type of frame
                     16'h9001:begin	//type == 0x9001:control frame(NACP)
                         if(w_mac_match)begin
                             o_dpkt_data          <=  520'b0                              ;
                             o_dpkt_data_en       <=  1'b0                                ;
-                            o_dpkt_meta          <=  256'b0                              ;
+                            o_dpkt_meta          <=  112'b0                              ;
 
                             o_cpkt_data      	 <=  w_ari_data_q                        ;          //transmit control frame directly
                             o_cpkt_data_en   	 <=  1'b1                                ;
@@ -254,28 +204,29 @@ always @(posedge i_sys_clk or negedge i_sys_rst_n)begin
 						    o_cpkt_meta[ 87: 80] <=  8'h00               				 ;			//Priority
 						    o_cpkt_meta[ 79: 78] <=  2'h0               				 ;			//PL:rev
 						    o_cpkt_meta[ 77: 64] <=  w_ari_info_q[109: 96]				 ;			//PL:Pkt_len
-						    o_cpkt_meta[ 63: 32] <=  32'h8000_0000               		 ;			//OutportBM
+						    o_cpkt_meta[ 63: 32] <=  w_ari_info_q[ 31:  0]       		 ;			//OutportBM
 						    o_cpkt_meta[ 31:  0] <=  w_ari_info_q[ 31:  0]               ;			//InportBM
                         end
                         else begin
                             o_dpkt_data          <=  w_ari_data_q                        ;          //transmit control frame directly
                             o_dpkt_data_en       <=  1'b1                                ;
 
-						    o_dpkt_meta[255:192] <=  w_ari_info_q[95:32]				 ;			//the current timestamp of frame
-						    o_dpkt_meta[191:160] <=  32'h0000_0000						 ;			//UD
-						    o_dpkt_meta[159:144] <=  16'h0000							 ;			//type in meta
-						    o_dpkt_meta[143:136] <=  8'h00               				 ;			//DMID
-						    o_dpkt_meta[135:128] <=  8'h00               				 ;			//SMID
-						    o_dpkt_meta[127:112] <=  16'h0000               			 ;			//AC
-						    o_dpkt_meta[111:107] <=  5'h00               				 ;			//ctrl:rev
-						    o_dpkt_meta[106] 	 <=  1'h0								 ; 			//ctrl:parse error flag
-						    o_dpkt_meta[105:104] <=  2'h1               				 ;			//ctrl:NACP control frame flag
-						    o_dpkt_meta[103: 88] <=  16'h0000               			 ;			//FID
-						    o_dpkt_meta[ 87: 80] <=  8'h00               				 ;			//Priority
-						    o_dpkt_meta[ 79: 78] <=  2'h0               				 ;			//PL:rev
-						    o_dpkt_meta[ 77: 64] <=  w_ari_info_q[109: 96]				 ;			//PL:Pkt_len
-						    o_dpkt_meta[ 63: 32] <=  32'h8000_0000               		 ;			//OutportBM
-						    o_dpkt_meta[ 31:  0] <=  w_ari_info_q[ 31:  0]               ;			//InportBM
+						    //o_dpkt_meta[255:192] <=  w_ari_info_q[95:32]				 ;			//the current timestamp of frame
+						    //o_dpkt_meta[191:160] <=  32'h0000_0000						 ;			//UD
+						    //o_dpkt_meta[159:144] <=  16'h0000							 ;			//type in meta
+						    //o_dpkt_meta[143:136] <=  8'h00               				 ;			//DMID
+						    //o_dpkt_meta[135:128] <=  8'h00               				 ;			//SMID
+						    //o_dpkt_meta[127:112] <=  16'h0000               			 ;			//AC
+						    //o_dpkt_meta[111:107] <=  5'h00               				 ;			//ctrl:rev
+						    //o_dpkt_meta[106] 	 <=  1'h0								 ; 			//ctrl:parse error flag
+						    //o_dpkt_meta[105:104] <=  2'h1               				 ;			//ctrl:NACP control frame flag
+						    //o_dpkt_meta[103: 88] <=  16'h0000               			 ;			//FID
+						    //o_dpkt_meta[ 87: 80] <=  8'h00               				 ;			//Priority
+						    //o_dpkt_meta[ 79: 78] <=  2'h0               				 ;			//PL:rev
+						    //o_dpkt_meta[ 77: 64] <=  w_ari_info_q[109: 96]				 ;			//PL:Pkt_len
+						    //o_dpkt_meta[ 63: 32] <=  w_ari_info_q[ 31:  0]        		 ;			//OutportBM
+						    //o_dpkt_meta[ 31:  0] <=  w_ari_info_q[ 31:  0]               ;			//InportBM
+							o_dpkt_meta			 <= w_ari_info_q						;
 
                             o_cpkt_data      	 <=  520'b0                              ;
                             o_cpkt_data_en   	 <=  1'b0                                ;
@@ -305,75 +256,26 @@ always @(posedge i_sys_clk or negedge i_sys_rst_n)begin
                             r_preparse_cs           <=  (w_mac_match ? NACPC_PREPARSE : SEND_PREPARSE)  ;
                         end
                     end
-                    16'h9002:begin	//type == 0x9002:data frame(Metadata)
-                        o_dpkt_data[519:518] <=  w_ari_data_q[519:518]               ;
-                        o_dpkt_data[517:512] <=  w_ari_data_q[517:512] + 6'h20       ;
-                        o_dpkt_data[511:256] <=  w_ari_data_q[255:0]                 ;
-                        o_dpkt_data[255:0]   <=  256'b0                              ;
-						
-						o_dpkt_meta[255:192] <=  w_ari_data_q[381] ? w_ari_data_q[511:448] : w_ari_info_q[95:32]	;	//AC[9](TSM replace disable) ? original timestamp in meta : the current timestamp of frame
-						o_dpkt_meta[191:160] <=  w_ari_data_q[447:416]               ;			//UD
-						o_dpkt_meta[159:144] <=  w_ari_data_q[415:400]               ;			//type in meta
-						o_dpkt_meta[143:136] <=  w_ari_data_q[399:392]               ;			//DMID
-						o_dpkt_meta[135:128] <=  w_ari_data_q[391:384]               ;			//SMID
-						o_dpkt_meta[127:112] <=  w_ari_data_q[383:368]               ;			//AC
-						o_dpkt_meta[111:107] <=  w_ari_data_q[367:363]               ;			//ctrl:rev
-						o_dpkt_meta[106] 	 <= (w_ari_info_q[109: 96] > 14'h20) ? 1'b0 : 1'b1; //ctrl:parse error flag（PL <= 32B）
-						o_dpkt_meta[105:104] <=  2'h2               				 ;			//ctrl:Metadata data frame flag
-						o_dpkt_meta[103: 88] <=  w_ari_data_q[359:344]               ;			//FID
-						o_dpkt_meta[ 87: 80] <=  w_ari_data_q[343:336]               ;			//Priority
-						o_dpkt_meta[ 79: 78] <=  w_ari_data_q[335:334]               ;			//PL:rev
-						o_dpkt_meta[ 77: 64] <=  w_ari_info_q[109: 96] - 14'h20		 ;			//PL:Pkt_len
-						o_dpkt_meta[ 63: 32] <=  w_ari_data_q[319:288]               ;			//OutportBM
-						o_dpkt_meta[ 31:  0] <=  w_ari_info_q[ 31:  0]               ;			//InportBM
-
-                        o_cpkt_data      	 <=  520'b0                              ;
-                        o_cpkt_data_en   	 <=  1'b0                                ;
-                        o_cpkt_meta      	 <=  256'b0                              ;
-                        o_cpkt_meta_en   	 <=  1'b0                                ;
-
-                        if(w_ari_data_q[518])begin		//the end of frame(frame <= 64B),transmit current data & meta ...
-                            o_dpkt_data_en       	<=  1'b1                ;	//transmit the frame data
-                            o_dpkt_meta_en       	<=  1'b1                ;	//transmit the frame meta
-                            if(i_dpkt_fifo_alf | i_cpkt_fifo_alf | w_ari_info_rdalempty)begin	//the dpkt_fifo or cpkt_fifo is almostfull or the info_fifo is alempty,go to wait ...
-                                r_preparse_cs       <=  IDLE_PREPARSE       ;
-                                r_ari_data_rd       <=  1'b0                ;
-                                r_ari_info_rd       <=  1'b0                ;
-                            end
-                            else begin	//reading the info&data fifo for next frame &  ready to parse and transmit ...
-                                r_preparse_cs       <=  FIRST_PREPARSE      ;
-                                r_ari_data_rd       <=  1'b1                ;
-                                r_ari_info_rd       <=  1'b1                ;
-                            end
-                        end
-                        else begin	// frame > 64B, reading the data fifo for current frame, and go to transmit the rest of frame data ...
-                            o_dpkt_data_en       <=  1'b0                ;
-                            o_dpkt_meta_en       <=  1'b0                ;
-
-                            r_ari_data_rd       <=  1'b1                ;
-                            r_ari_info_rd       <=  1'b0                ;
-                            r_preparse_cs       <=  META_PREPARSE       ;
-                        end
-                    end
                     default:begin	//other data frame
                         o_dpkt_data          <=  w_ari_data_q                        ;//transmit control frame directly
                         o_dpkt_data_en       <=  1'b1                                ;
 						
-						o_dpkt_meta[255:192] <=  w_ari_info_q[95:32]				 ;			//the current timestamp of frame
-						o_dpkt_meta[191:160] <=  32'h0000_0000						 ;			//UD
-						o_dpkt_meta[159:144] <=  16'h0000							 ;			//type in meta
-						o_dpkt_meta[143:136] <=  8'h00               				 ;			//DMID
-						o_dpkt_meta[135:128] <=  8'h00               				 ;			//SMID
-						o_dpkt_meta[127:112] <=  16'h0000               			 ;			//AC
-						o_dpkt_meta[111:107] <=  5'h00               				 ;			//ctrl:rev
-						o_dpkt_meta[106] 	 <=  1'h0								 ; 			//ctrl:parse error flag
-						o_dpkt_meta[105:104] <=  2'h3               				 ;			//ctrl:other frame flag
-						o_dpkt_meta[103: 88] <=  16'h0000               			 ;			//FID
-						o_dpkt_meta[ 87: 80] <=  8'h00               				 ;			//Priority
-						o_dpkt_meta[ 79: 78] <=  2'h0               				 ;			//PL:rev
-						o_dpkt_meta[ 77: 64] <=  w_ari_info_q[109: 96]				 ;			//PL:Pkt_len
-						o_dpkt_meta[ 63: 32] <=  32'h8000_0000               		 ;			//OutportBM
-						o_dpkt_meta[ 31:  0] <=  w_ari_info_q[ 31:  0]               ;			//InportBM
+						//o_dpkt_meta[255:192] <=  w_ari_info_q[95:32]				 ;			//the current timestamp of frame
+						//o_dpkt_meta[191:160] <=  32'h0000_0000						 ;			//UD
+						//o_dpkt_meta[159:144] <=  16'h0000							 ;			//type in meta
+						//o_dpkt_meta[143:136] <=  8'h00               				 ;			//DMID
+						//o_dpkt_meta[135:128] <=  8'h00               				 ;			//SMID
+						//o_dpkt_meta[127:112] <=  16'h0000               			 ;			//AC
+						//o_dpkt_meta[111:107] <=  5'h00               				 ;			//ctrl:rev
+						//o_dpkt_meta[106] 	 <=  1'h0								 ; 			//ctrl:parse error flag
+						//o_dpkt_meta[105:104] <=  2'h3               				 ;			//ctrl:other frame flag
+						//o_dpkt_meta[103: 88] <=  16'h0000               			 ;			//FID
+						//o_dpkt_meta[ 87: 80] <=  8'h00               				 ;			//Priority
+						//o_dpkt_meta[ 79: 78] <=  2'h0               				 ;			//PL:rev
+						//o_dpkt_meta[ 77: 64] <=  w_ari_info_q[109: 96]				 ;			//PL:Pkt_len
+						//o_dpkt_meta[ 63: 32] <=  32'h8000_0000               		 ;			//OutportBM
+						//o_dpkt_meta[ 31:  0] <=  w_ari_info_q[ 31:  0]               ;			//InportBM
+						o_dpkt_meta				<= w_ari_info_q						 ;
 
                         o_cpkt_data      	 <=  520'b0          ;
                         o_cpkt_data_en   	 <=  1'b0            ;
@@ -486,7 +388,7 @@ always @(posedge i_sys_clk or negedge i_sys_rst_n)begin
             NACPC_PREPARSE:begin
                 o_dpkt_data          <=  520'b0                      ;
                 o_dpkt_data_en       <=  1'b0                        ;
-                o_dpkt_meta          <=  256'b0                      ;
+                o_dpkt_meta          <=  112'b0                      ;
                 o_dpkt_meta_en       <=  1'b0                        ;
 
                 o_cpkt_data      	 <=  w_ari_data_q                ;//transmit control frame directly
@@ -631,7 +533,7 @@ always @(posedge i_sys_clk or negedge i_sys_rst_n)begin
             DISC_PREPARSE:begin
                 o_dpkt_data        	<=  520'b0   		            ;
                 o_dpkt_data_en     	<=  1'b0     		            ;
-                o_dpkt_meta        	<=  256'b0   		            ;
+                o_dpkt_meta        	<=  112'b0   		            ;
                 o_dpkt_meta_en     	<=  1'b0     		            ;
                 
                 o_cpkt_data         <=  520'b0                      ;
@@ -662,7 +564,7 @@ always @(posedge i_sys_clk or negedge i_sys_rst_n)begin
             default:begin
                 o_dpkt_data          <=  520'b0          ;
                 o_dpkt_data_en       <=  1'b0            ;
-                o_dpkt_meta          <=  256'b0          ;
+                o_dpkt_meta          <=  112'b0          ;
                 o_dpkt_meta_en       <=  1'b0            ;
 
                 o_cpkt_data      <=  520'b0          ;
@@ -749,8 +651,8 @@ always @(posedge i_sys_clk or negedge i_sys_rst_n)begin
         o_cpkt_dfpul       	<=  1'b0          	;
     end
     else begin
-        o_dpkt_dfpul   		<=  ((r_preparse_cs == DISC_PREPARSE) && (w_ari_data_q[519] == 1'b1) && (w_ari_data_q[415:400] != 16'h9001))    ;
-        o_cpkt_dfpul   		<=  ((r_preparse_cs == DISC_PREPARSE) && (w_ari_data_q[519] == 1'b1) && (w_ari_data_q[415:400] == 16'h9001))    ;
+        o_dpkt_dfpul   		<=  ((r_preparse_cs == DISC_PREPARSE) && (w_ari_data_q[519] == 1'b1) && (w_ari_data_q[383:368] != 16'h9001))    ;
+        o_cpkt_dfpul   		<=  ((r_preparse_cs == DISC_PREPARSE) && (w_ari_data_q[519] == 1'b1) && (w_ari_data_q[383:368] == 16'h9001))    ;
     end
 end
 `endif
@@ -769,7 +671,7 @@ end
 `ifdef DEBUG_LEVEL3
 always @(posedge i_sys_clk or negedge i_sys_rst_n)begin
     if(!i_sys_rst_n) begin
-        o_preparse_cs  <=  4'b0            ;
+        o_preparse_cs  <=  4'b0           ;
     end
     else begin
         o_preparse_cs  <=  r_preparse_cs  ;
@@ -777,69 +679,27 @@ always @(posedge i_sys_clk or negedge i_sys_rst_n)begin
 end
 `endif
 
-//=========================================== fifo instantiations ==========================================//
-
-wire                            w_data_e1a      ;           //active-high,one bit or two bit error is detected(ECC)
-wire                            w_data_e2a      ;           //active-high,two or more bit error is detected(ECC)
-
-wire                            w_info_e1a      ;           //active-high,one bit or two bit error is detected(ECC)
-wire                            w_info_e2a      ;           //active-high,two or more bit error is detected(ECC)
-
-always @(posedge i_sys_clk or negedge i_sys_rst_n)begin
-    if(!i_sys_rst_n) begin
-        e1a    <=  2'b0            ;
-        e2a    <=  2'b0            ;
-    end
-    else begin
-        e1a[0]    <=  w_data_e1a   ?   1'b1    :   e1a[0];
-        e1a[1]    <=  w_info_e1a   ?   1'b1    :   e1a[1];
-
-        e2a[0]    <=  w_data_e2a   ?   1'b1    :   e2a[0];
-        e2a[1]    <=  w_info_e2a   ?   1'b1    :   e2a[1];
-    end
-end
-
-
-SYNCFIFO_128x520 ari_data_fifo(
-			.e1a                (w_data_e1a                     ),
-			.e2a                (w_data_e2a                     ),
-			.aclr				(~i_sys_rst_n					),
-			.data				(i_ari_data 					),
-			.rdreq				(r_ari_data_rd				    ),
+SYNCFIFO_128X520 ari_data_fifo(
+			.srst				(~i_sys_rst_n					),
+			.din				(i_ari_data 					),
+			.rd_en				(r_ari_data_rd				    ),
 			.clk				(i_sys_clk						),
-			.wrreq				(i_ari_data_en  				),
-			.q					(w_ari_data_q   				),
-            .wrfull             (                               ),
-	        .wralfull           (                               ),
-	        .wrempty            (                               ),
-	        .wralempty          (                               ),
-	        .rdfull             (                               ),
-	        .rdalfull           (                               ),
-			.rdempty			(w_ari_data_rdempty             ),
-			.rdalempty          (							    ),
-			.wrusedw			(w_ari_data_wrusedw             ),
-			.rdusedw			(							    )
+			.wr_en				(i_ari_data_en  				),
+			.dout				(w_ari_data_q   				),
+			.empty				(w_ari_data_rdempty             ),
+			.data_count			(w_ari_data_wrusedw             )
 );
 
 SYNCFIFO_128x112 ari_info_fifo(
-			.e1a                (w_info_e1a                     ),
-			.e2a        		(w_info_e2a                     ),
-			.aclr				(~i_sys_rst_n					),
-			.data				(i_ari_info					    ),
-			.rdreq				(r_ari_info_rd				    ),
+			.srst				(~i_sys_rst_n					),
+			.din				(i_ari_info					    ),
+			.rd_en				(r_ari_info_rd				    ),
 			.clk				(i_sys_clk						),
-			.wrreq				(i_ari_info_en				    ),
-			.q					(w_ari_info_q				    ),
-            .wrfull             (                               ),
-	        .wralfull           (                               ),
-	        .wrempty            (                               ),
-	        .wralempty          (                               ),
-	        .rdfull             (                               ),
-	        .rdalfull           (                               ),
-			.rdempty			(w_ari_info_rdempty             ),
-            .rdalempty			(w_ari_info_rdalempty   		),
-			.wrusedw			(w_ari_info_wrusedw             ),
-			.rdusedw			(                               )
+			.wr_en				(i_ari_info_en				    ),
+			.dout				(w_ari_info_q				    ),
+			.empty				(w_ari_info_rdempty             ),
+            .almost_empty		(w_ari_info_rdalempty   		),
+			.data_count			(w_ari_info_wrusedw             )			
 );
 
 

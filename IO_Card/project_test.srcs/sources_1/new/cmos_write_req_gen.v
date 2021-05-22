@@ -29,7 +29,7 @@ begin
 	begin
 		write_req <= 1'b0;
 	end
-	else if(cmos_vsync_d0 == 1'b1 && cmos_vsync_d1 == 1'b0)
+	else if(cmos_vsync_d0 == 1'b1 && cmos_vsync_d1 == 1'b0)		// 帧同步信号的下降沿时产生写请求信号
 	begin
 		write_req <= 1'b1;
 	end
