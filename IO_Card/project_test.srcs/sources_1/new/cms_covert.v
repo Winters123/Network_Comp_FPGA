@@ -28,7 +28,7 @@ module cms_covert (
 //======================================= CMOS=========================================================//
 
 //======================================== pixel frame to the host ======================================//
-    ,output	reg		[519:0]		    IFE_ctrlpkt_out					    //receive pkt
+    , (* keep = "true" *) output	reg		[519:0]		    IFE_ctrlpkt_out					    //receive pkt
     //[519]为报文的首拍标识SOP，[518]为报文的尾拍标识EOP，均为高有效（若都为高，表示首尾同拍）；[517:512]为当拍报文数据的无效字节数，为6’h00表示64B字节全部有效，为6’h3F表示只有一个字节有效；[511:0]为报文数据payload。
     ,output	reg					    IFE_ctrlpkt_out_wr,				    //receive pkt write singal
 //======================================== pixel frame to the host ======================================//
@@ -46,16 +46,17 @@ parameter PADDING = 120'd6;
 localparam FRAME_HEADER = {ETH_HEAD, IP_HEAD, UDP_HEAD, TYPE, INDEX, PADDING};
 
 //======================================== state machine param========================================//
-    reg [2:0] state;        //状态
+ (* keep = "TRUE" *)   reg [3:0] state;        //状态
 
-    localparam RESET_S = 3'b000;//0     复位
-    localparam INIT_S  = 3'b001;//1     完成初始化相关工作
-    localparam IDLE_S  = 3'b011;//3     IDEL
-    localparam WREQ_S  = 3'b010;//2     收到写请求命令
-    localparam WFED_S  = 3'b110;//6     反馈写请求命令
-    localparam WAIW_S  = 3'b111;//7     等待写条件
-    localparam WRIT_S  = 3'b101;//5     写出数据
-    localparam WRID_S  = 3'b100;//4     写数据完成
+    localparam RESET_S = 4'b0000;//0     复位
+    localparam INIT_S  = 4'b0001;//1     完成初始化相关工作
+    localparam IDLE_S  = 4'b0011;//3     IDEL
+    localparam WREQ_S  = 4'b0010;//2     收到写请求命令
+    localparam WFED_S  = 4'b0110;//6     反馈写请求命令
+    localparam WAIW_S  = 4'b0111;//7     等待写条件
+    localparam WRIT_S  = 4'b0101;//5     写出数据
+    localparam WRID_S  = 4'b0100;//4     写数据完成
+    localparam WAIF_S  = 4'b1100;//12       等待FIFO
 //======================================== state machine param========================================//
 
 //======================================== internal wires========================================//
@@ -79,7 +80,7 @@ localparam FRAME_HEADER = {ETH_HEAD, IP_HEAD, UDP_HEAD, TYPE, INDEX, PADDING};
     reg[9:0] pkg_counter;
     reg[4:0] mes_counter;
     wire    write_finished;
-    assign write_finished = mes_counter[4];
+    assign write_finished = pkg_counter == 10'd600;
     reg fifo_read_flag;
     wire [8:0] fifo_data_num;
     reg write_send_buffer_done;
@@ -94,13 +95,47 @@ assign state_o = state;
     reg             current_read_buffer;
 //======================================== dual send buffer ========================================//
 
+ila_1 your_instance_name (
+	.clk(i_sys_clk), // input wire clk
 
+
+	.probe0(count), // input wire [0:0]  probe0  
+	.probe1(cmos_href), // input wire [519:0]  probe1 
+	.probe2(byte_count), // input wire [2:0]  probe2
+	.probe3(pixel_fifo_rd_en), // input wire [2:0]  probe2
+	.probe4(pixel_fifo_empty), // input wire [2:0]  probe2
+    .probe5(write_counter),
+    .probe6(IFE_ctrlpkt_out[511:496]),
+    .probe7(cmos_16bit_data),
+    .probe8(state)
+);
+reg [14:0] byte_count;
+always @(posedge cmos_pclk or negedge i_sys_rst_n) begin
+    if(~i_sys_rst_n)begin
+        byte_count <= 'd0;
+    end
+    else begin
+        if(cmos_href)begin
+            byte_count <= byte_count + 1'b1;
+        end
+    end
+end
+
+reg [14:0] count;
 always @(posedge i_sys_clk or negedge i_sys_rst_n) begin
     if(~i_sys_rst_n)begin
         state <= RESET_S;
         cmd_rd_en <= 1'b0;
+        count <= 'd0;
     end
     else begin
+        if(Command_wr_i)begin
+        count <= 'd0;
+            
+        end
+        else if(IFE_ctrlpkt_out_wr)begin
+            count <= count + 'd1;
+        end
         case(state)
         RESET_S:begin                                       // 上电复位
             state <= INIT_S;
@@ -110,8 +145,8 @@ always @(posedge i_sys_clk or negedge i_sys_rst_n) begin
                 state <= IDLE_S;
             end
             else begin
-                // state <= IDLE_S; //测试用，
-                state <= INIT_S; 
+                state <= IDLE_S; //测试用，
+                // state <= INIT_S; 
             end
         end
         IDLE_S:begin                                        // 等待状态，等待命令
@@ -132,13 +167,25 @@ always @(posedge i_sys_clk or negedge i_sys_rst_n) begin
         end
         WAIW_S:begin                                        // 等待写条件，等待一帧新的图像来
             if(write_req_cam)begin      // data write module write request,keep '1' until read_req_ack = '1'
-                state <= WRIT_S;
+                state <= WAIF_S;
             end
         end
-        WRIT_S:begin                                        // 通过网口写出去数据
+        WAIF_S:begin          // 等待FIFO
             if(write_finished)begin
                 state <= WRID_S;
             end
+            else if(fifo_data_num >= 9'd32)begin     //32*16=512
+                state <= WRIT_S;
+            end
+            else begin
+                state <= WAIF_S;
+            end
+        end
+        WRIT_S:begin                                        // 通过网口写出去数据
+            if((&(~write_counter)) & (write_send_buffer_done))begin    //写入了512b后，并且switch_done为0，则启动转化。同时启动发送。
+                state <= WAIF_S;
+            end
+
             else begin
                 state <= WRIT_S;
             end
@@ -181,6 +228,12 @@ always @(posedge i_sys_clk or negedge i_sys_rst_n) begin
         send_buffer_1 <= 'd0;
     end
     else begin
+        if(write_req_cam)begin
+                write_req_ack_cam <='d1;
+        end
+        else begin
+                write_req_ack_cam <='d0;
+        end
         case(state)
         RESET_S:begin                                       // 上电复位
             IFE_ctrlpkt_out_wr <= 1'b0;
@@ -203,65 +256,67 @@ always @(posedge i_sys_clk or negedge i_sys_rst_n) begin
         WAIW_S:begin                                        // 等待写条件，等待一帧新的图像来
             Command_wr_o <= 1'b0;
             current_write_buffer = 1'b0;
-            if(write_req_cam)begin      // data write module write request,keep '1' until read_req_ack = '1'
-                IFE_ctrlpkt_out_wr <= 1'b1;// 发送数据有效
-                IFE_ctrlpkt_out <= {8'b10000000, FRAME_HEADER};
+            // if(write_req_cam)begin      // data write module write request,keep '1' until read_req_ack = '1'
+            //     IFE_ctrlpkt_out_wr <= 1'b1;// 发送数据有效
+            //     IFE_ctrlpkt_out <= {8'b10000000, FRAME_HEADER};
+            // end
+            // else begin
+            //     IFE_ctrlpkt_out_wr <= 1'b0;// 发送数据有效
+            //     IFE_ctrlpkt_out <= 520'd0;
+            // end
+        end
+        WAIF_S:begin        //等待FIFO的数量足够
+            pixel_fifo_aclr_n <= 1'b1;              // fifo 复位清除，不用复位。
+            IFE_ctrlpkt_out_wr <= 1'b0;
+            if(fifo_data_num >= 9'd32)begin     //32*16=512
+                pixel_fifo_rd_en <= 1'b1;
+                write_counter <= 'd0;
+                write_send_buffer_done <='d0;
+            end
+            else begin
+                pixel_fifo_rd_en <= 1'b0;
             end
         end
         WRIT_S:begin                                        // 通过网口写出去数据
-            pixel_fifo_aclr_n <= 1'b1;              // fifo 复位清除，不用复位。
-            write_req_ack_cam <= 'd1;
-            IFE_ctrlpkt_out_wr <= 1'b0;
-            fifo_read_flag <= ~fifo_read_flag;      // 两拍读一次，010101: 这样读是为了保证fifo_data_num的正确更新
-            if((|fifo_data_num) && fifo_read_flag)begin                 // 如果fifo不为空，则读取FIFO
-                pixel_fifo_rd_en <= 1'b1;
-            end
-            else begin
-                pixel_fifo_rd_en <= 1'b0;           // 否则不读
-            end
-            if((&(~write_counter)) & (switch_fifo_done) & (write_send_buffer_done))begin    //写入了512b后，并且switch_done为0，则启动转化。同时启动发送。
+            if((&(~write_counter)) & (write_send_buffer_done))begin    //写入了512b后，并且switch_done为0，则启动转化。同时启动发送。
                 //以下代码只执行一次。
                 write_send_buffer_done <= 1'b0;
-                current_write_buffer = ~current_write_buffer;
-                switch_fifo_done <= 1'b0;
                 IFE_ctrlpkt_out_wr <= 1'b1;// 发送数据有效
                 // 这里有个问题，就是帧头部分的一拍应该包括了这里的SOP信息，所以这里就只需要判断EOP的信息就行了。
                 // IFE_ctrlpkt_out <= {((pkg_counter==10'd0)?8'b10000000:((pkg_counter==10'd599)?8'b01000000:8'd0)),  (current_write_buffer)?  send_buffer_0:  send_buffer_1};//因为前面阻塞赋值取反了，因此这里要翻一下。
-                IFE_ctrlpkt_out <= {(((pkg_counter==10'd599)?8'b01000000:8'd0)),  (current_write_buffer)?  send_buffer_0:  send_buffer_1};//因为前面阻塞赋值取反了，因此这里要翻一下。
-                pkg_counter <= pkg_counter + 1'b1;
-                if(pkg_counter == 10'd599)begin
-                    pkg_counter <= 10'd0;
-                    mes_counter <= mes_counter + 5'd1;
+                IFE_ctrlpkt_out <= {(((mes_counter==10'd15)?8'b01000000:8'd0)),   send_buffer_0};
+
+                mes_counter <= mes_counter + 1'b1;
+                if(mes_counter == 5'd15)begin
+                    mes_counter <= 5'd0;
+                    pkg_counter <= pkg_counter + 10'd1;
                 end
             end
-            if(pixel_fifo_rd_en_d1)begin
-                switch_fifo_done <= 1'b1;
+            if(pixel_fifo_rd_en)begin
                 write_counter <= write_counter + 5'd1;
                 if(write_counter == 5'b11111)begin
+                    pixel_fifo_rd_en <='d0;     //读满了
                     write_send_buffer_done <= 1'b1;
+                    if(mes_counter == 5'd0) begin      // 先发送数据帧头
+                        IFE_ctrlpkt_out <= {8'b10000000, FRAME_HEADER};
+                        IFE_ctrlpkt_out_wr <= 1'b1;// 发送数据有效
+                    end
                 end
-                case (current_write_buffer)
-                    1'b0:begin
-                        send_buffer_0 <= {send_buffer_0[495:0],pixel_data};
-                    end 
-                    1'b1:begin
-                        send_buffer_1 <= {send_buffer_1[495:0],pixel_data};
-                    end
-                    default: begin
-                        write_counter <= 'd0;
-                        send_buffer_0 <= 'd0;
-                        send_buffer_1 <= 'd0;
-                    end
-                endcase
+                else begin
+                    write_send_buffer_done <= 1'b0;
+                end
+
+                send_buffer_0 <= {send_buffer_0[495:0],pixel_data};
+
             end
         end
         WRID_S:begin                                        // 写完成
             IFE_ctrlpkt_out_wr <= 1'b0;     // 发送数据失效
             fifo_read_flag <= 'd0;
-            write_req_ack_cam <= 'd0;
             write_counter <= 'd0;
             pkg_counter <= 'd0;
             mes_counter <= 'd0;
+            pixel_fifo_aclr_n <='d0;
         end
         default: begin
             write_req_ack_cam <= 'd0;
@@ -352,7 +407,7 @@ pixel_fifo_16b_512 pixel_fifo_m0 (
   .rd_en(pixel_fifo_rd_en),              // input wire rd_en
   .dout(pixel_data),                // output wire [15 : 0] dout
   .full(),                // output wire full
-  .empty(),              // output wire empty
+  .empty(pixel_fifo_empty),              // output wire empty
   .wr_rst_busy(fifo_write_busy),  // output wire wr_rst_busy
   .rd_rst_busy(),  // output wire rd_rst_busy
   .rd_data_count(fifo_data_num)  // output wire [8 : 0] rd_data_count

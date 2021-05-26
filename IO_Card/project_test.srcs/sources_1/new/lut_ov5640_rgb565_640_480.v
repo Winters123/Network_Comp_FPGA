@@ -91,7 +91,7 @@ begin
 		10'd 53: lut_data <= {8'h78 , 24'h3004ff};// enable clocks 
 		10'd 54: lut_data <= {8'h78 , 24'h300e58};// MIPI power down, DVP enable
 		10'd 55: lut_data <= {8'h78 , 24'h302e00};
-		10'd 56: lut_data <= {8'h78 , 24'h430060};// RGB565
+		10'd 56: lut_data <= {8'h78 , 24'h430060};// RGB565			//这个可以在数据手册中找到
 		10'd 57: lut_data <= {8'h78 , 24'h501f01};// ISP RGB 
 		10'd 58: lut_data <= {8'h78 , 24'h440e00};
 		10'd 59: lut_data <= {8'h78 , 24'h5000a7}; // Lenc on, raw gamma on, BPC on, WPC on, CIP on // AEC target    自动曝光控制
