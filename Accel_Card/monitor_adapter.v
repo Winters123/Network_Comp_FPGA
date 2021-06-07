@@ -77,10 +77,16 @@ module monitor_adaptor(
 
 //TODO 1: receive signal from ctrl, read a frame out;
 
-reg                     fifo_wr_en;
-reg                     fifo_rd_en;
-wire [511:0]            fifo_data_out;
-reg  [511:0]            fifo_data_in;
+reg                     fifo_wr_en_1;
+reg                     fifo_rd_en_1;
+wire [511:0]            fifo_data_out_1;
+reg  [511:0]            fifo_data_in_1;
+
+reg                     fifo_wr_en_2;
+reg                     fifo_rd_en_2;
+wire [511:0]            fifo_data_out_2;
+reg  [511:0]            fifo_data_in_2;
+
 
 reg  [31:0]             ddr_read_addr;
 reg  [31:0]             ddr_read_data;
@@ -88,8 +94,16 @@ reg  [7:0]              ddr_read_len;
 reg                     ddr_read_arvalid, ddr_read_last;
 
 
-wire                    fifo_full;
-wire                    fifo_empty;
+wire                    fifo_full_1;
+wire                    fifo_empty_1;
+
+wire                    fifo_full_2;
+wire                    fifo_empty_2;
+
+always @(posedge clk) begin
+    fifo_data_in_2 <= fifo_data_out_1;
+    fifo_wr_en_2 <= fifo_rd_en_1;
+end
 
 reg  [519:0]            pkt_segment;
 reg  [5:0]              pkt_segment_cnt;  //for state machine ctrl
@@ -112,8 +126,7 @@ always @(posedge clk or negedge aresetn) begin
         ddr_read_finish_valid <= 1'b0;
         ddr_read_finish <= 1'b0;
 
-        fifo_wr_en <= 1'b0;
-        fifo_rd_en <= 1'b0;
+        fifo_rd_en_2 <= 1'b0;
         pkt_segment <= 520'b0;
         pkt_segment_cnt <= 6'b0;
         pkt_cnt <= 10'b0;
@@ -148,8 +161,8 @@ always @(posedge clk or negedge aresetn) begin
                     pkt_segment <= 0;
                     pkt_segment_cnt <= 0;
 
-                    fifo_wr_en <= 1'b0;
-                    fifo_rd_en <= 1'b0;
+                    fifo_wr_en_2 <= 1'b0;
+                    fifo_rd_en_2 <= 1'b0;
                     pkt_segment <= 520'b0;
                     pkt_segment_cnt <= 6'b0;
 
@@ -175,14 +188,14 @@ always @(posedge clk or negedge aresetn) begin
 
                     //update pkt_segment
                     if (~fifo_empty) begin
-                        pkt_segment <= {2'b00, 6'b0, fifo_data_out};
+                        pkt_segment <= {2'b00, 6'b0, fifo_data_out_2};
                         pkt_segment_cnt <= pkt_segment_cnt + 1'b1;
 
-                        fifo_rd_en <= 1'b1;
+                        fifo_rd_en_2 <= 1'b1;
                     end
                     else begin
                         fifo_read_state <= WAIT_S1;
-                        fifo_rd_en <= 1'b0;
+                        fifo_rd_en_2 <= 1'b0;
                     end
                 end
 
@@ -197,7 +210,7 @@ always @(posedge clk or negedge aresetn) begin
                     pkt_cnt <= pkt_cnt + 1'b1;
                     pkt_segment_cnt <= 0;
                     //stop read from fifo
-                    fifo_rd_en <= 1'b0;
+                    fifo_rd_en_2 <= 1'b0;
 
                     fifo_read_state <= IDLE_S1;
                 end
@@ -206,7 +219,7 @@ always @(posedge clk or negedge aresetn) begin
                     //hold, wait for data ready to send
                     pkt_out_en <= 1'b0;
                     pkt_segment <= pkt_segment;
-                    fifo_rd_read <= 1'b0;
+                    fifo_rd_en_2 <= 1'b0;
                     pkt_out_data <= 0;
                 end
 
@@ -214,12 +227,12 @@ always @(posedge clk or negedge aresetn) begin
             end
             WAIT_S1: begin
                 if(fifo_empty) begin
-                    fifo_rd_en <= 0;
+                    fifo_rd_en_2 <= 0;
                     pkt_segment <= 0;
                 end
                 else begin
-                    fifo_rd_en <= 1'b1;
-                    pkt_segment <= {2'b00, 6'b0, fifo_data_out};
+                    fifo_rd_en_2 <= 1'b1;
+                    pkt_segment <= {2'b00, 6'b0, fifo_data_out_2};
                     fifo_read_state <= COLLECT_S1;
                 end
             end
@@ -228,6 +241,7 @@ always @(posedge clk or negedge aresetn) begin
 end
 
 //TODO 3: read DDR data out to the FIFO
+//checkme: need rewriting....
 
 reg  [31:0]             ddr_read_addr;
 reg  [31:0]             ddr_read_data;
@@ -263,7 +277,8 @@ localparam IDLE_S2 = 5'd0,
 
 localparam READ_ADDR_IDX0 = {28'haf00000,2'b0};
 localparam READ_ADDR_IDX1 = {28'haf80000,2'b0};
-localparam FRAME_SIZE = 28'd153600;
+localparam FRAME_SIZE = 28'd153600;  //needs 153600 4B ddr reads;
+localparam TRANSAC_NUM = 14'd9600;
 
 reg  [3:0]               axi_rnd_cnt;
 reg  [13:0]              axi_burst_cnt;
@@ -272,8 +287,8 @@ reg  [13:0]              axi_burst_cnt;
 //each burst is a 512b (16 x 32b) fifo_data_in, need a counter
 always @(posedge clk or negedge aresetn) begin
     if(~aresetn) begin
-        fifo_wr_en <= 1'b0;
-        fifo_data_in <= 512'b0;
+        fifo_wr_en_1 <= 1'b0;
+        fifo_data_in_1 <= 32'b0;
 
         ddr_read_addr <= 32'b0;
         ddr_read_data <= 32'b0;
@@ -290,13 +305,13 @@ always @(posedge clk or negedge aresetn) begin
                 //TODO add almost full for fifo
                 if(ddr_read_start && ddr_read_start_valid && ddr_read_start_ready && !fifo_almost_full) begin
                     //start read
-                    axi_burst_cnt <= axi_burst_cnt + 11'b1;
+                    axi_burst_cnt <= axi_burst_cnt + 14'b1;
                     ddr_read_arvalid <= 1'b1;
 
                     if(odd_even_flag) ddr_read_addr <= READ_ADDR_IDX1; 
                     else ddr_read_addr <= READ_ADDR_IDX0;
 
-                    fifo_wr_en <= 1'b0;
+                    fifo_wr_en_1 <= 1'b0;
                     fifo_write_state <= WAIT_S2;
                 end
                 else begin
@@ -320,10 +335,10 @@ always @(posedge clk or negedge aresetn) begin
                 if(M_AXI_RVALID) begin
                     if(M_AXI_RLAST) begin
                         //write the fifo_data_in into fifo
-                        fifo_wr_en <= 1'b1;
-                        fifo_data_in <= {M_AXI_RDATA, fifo_data_in[479:0]};
+                        fifo_wr_en_1 <= 1'b1;
+                        fifo_data_in_1 <= M_AXI_RDATA;
                         //if this is the final burst of the frame
-                        if(axi_burst_cnt == 14'd9599) begin
+                        if(axi_rnd_cnt == 14'd9599) begin
                             axi_rnd_cnt <= 4'b0;
                             axi_burst_cnt <= 14'b0;
                             fifo_write_state <= IDLE_S2;
@@ -337,7 +352,8 @@ always @(posedge clk or negedge aresetn) begin
                     end
                     else begin
                         //within a burst, put rdata into fifo_data_in
-                        fifo_data_in[axi_rnd_cnt*32 +: 32] <= M_AXI_RDATA;
+                        fifo_rd_en_1 <= 1'b1;
+                        fifo_data_in_1 <= M_AXI_RDATA;
                         axi_rnd_cnt <= axi_rnd_cnt + 4'b1;
                         fifo_write_state <= PROC_S2;
                     end
@@ -347,13 +363,13 @@ always @(posedge clk or negedge aresetn) begin
             //within 9600 bursts
             BURST_SUCC_S2: begin
                 //reset fifo signals
-                fifo_wr_en <= 1'b0;
-                fifo_data_in <= 512'b0;
+                fifo_wr_en_1 <= 1'b0;
+                fifo_data_in_1 <= 32'b0;
 
                 //proceed to next burst
-                axi_burst_cnt <= axi_burst_cnt + 11'b1;
+                axi_burst_cnt <= axi_burst_cnt + 14'b1;
                 ddr_read_arvalid <= 1'b1;
-                ddr_read_addr <= ddr_read_addr + 32'd16; //read 512b once
+                ddr_read_addr <= ddr_read_addr + 32'b100; //read 512b once
                 fifo_write_state <= WAIT_S2;
             end
         endcase
@@ -362,15 +378,28 @@ end
 
 
 //IP core initialized here
-fifo_32i_512o_32d ddr_read_fifo (
+fifo_32i_256o_32d ddr_read_fifo_1 (
   .clk(clk),                  // input wire clk
   .srst(~aresetn),                // input wire srst
-  .din(fifo_data_in),              // input wire [704 : 0] din
-  .wr_en(fifo_wr_en),              // input wire wr_en
-  .rd_en(fifo_rd_en),              // input wire rd_en
-  .dout(fifo_data_out),            // output wire [704 : 0] dout
-  .full(fifo_full),                // output wire full
-  .empty(fifo_empty),              // output wire empty
+  .din(fifo_data_in_1),              // input wire [31 : 0] din
+  .wr_en(fifo_wr_en_1),              // input wire wr_en
+  .rd_en(fifo_rd_en_1),              // input wire rd_en
+  .dout(fifo_data_out_1),            // output wire [255 : 0] dout
+  .full(fifo_full_1),                // output wire full
+  .empty(fifo_empty_1),              // output wire empty
+  .wr_rst_busy(),   // output wire wr_rst_busy
+  .rd_rst_busy()    // output wire rd_rst_busy
+);
+
+fifo_256i_512o_32d ddr_read_fifo_2 (
+  .clk(clk),                  // input wire clk
+  .srst(~aresetn),                // input wire srst
+  .din(fifo_data_in_2),              // input wire [31 : 0] din
+  .wr_en(fifo_wr_en_2),              // input wire wr_en
+  .rd_en(fifo_rd_en_2),              // input wire rd_en
+  .dout(fifo_data_out_2),            // output wire [255 : 0] dout
+  .full(fifo_full_2),                // output wire full
+  .empty(fifo_empty_2),              // output wire empty
   .wr_rst_busy(),   // output wire wr_rst_busy
   .rd_rst_busy()    // output wire rd_rst_busy
 );

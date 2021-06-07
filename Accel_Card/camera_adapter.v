@@ -74,8 +74,8 @@ localparam SRC_MAC = 48'hacacacacacac;
 localparam DST_MAC = 48'hadadadadadad;
 localparam DATA_TYPE = 16'h9000;
 
-localparam WR_ADDR_IDX0 = {28'haf00000,2'b0};
-localparam WR_ADDR_IDX1 = {28'haf80000,2'b0};
+localparam WR_ADDR_IDX0 = {28'haf00000,2'b0}; //each addr is 4B.
+localparam WR_ADDR_IDX1 = {28'haf80000,2'b0}; 
 localparam FRAME_SIZE = 28'd153600;
 
 
@@ -88,8 +88,7 @@ localparam FRAME_SIZE = 28'd153600;
 
 //push data to FIFO
 reg [2:0] fifo_write_state;
-localparam IDLE_S1 = 3'd0.
-           READY_S1 = 3'd1,
+localparam IDLE_S1 = 3'd0,
            WR_FIFO_S1 = 3'd2;
 
 always @(posedge clk or negedge aresetn) begin
@@ -100,15 +99,17 @@ always @(posedge clk or negedge aresetn) begin
     end
     else begin
         case(fifo_write_state)
+            // IDLE_S1: begin
+            //     fifo_data_in <= 512'b0;
+            //     fifo_wr_en <= 1'b0;
+            //     if(ddr_write_start_valid && ddr_write_start_ready && ddr_write_start) begin
+            //         //ready to write FIFO
+            //         fifo_write_state <= READY_S1;
+            //     end
+            // end
             IDLE_S1: begin
                 fifo_data_in <= 512'b0;
                 fifo_wr_en <= 1'b0;
-                if(ddr_write_start_valid && ddr_write_start_ready && ddr_write_start) begin
-                    //ready to write FIFO
-                    fifo_write_state <= READY_S1;
-                end
-            end
-            READY_S1: begin
                 //if the header matches:
                 if(pktin_en) begin
                     if(pktin_data[511-:48] == DST_MAC && pktin_data[463-:48] == SRC_MAC) begin
@@ -117,7 +118,7 @@ always @(posedge clk or negedge aresetn) begin
                     else fifo_write_state <= IDLE_S1;
                 end
                 //TODO could add a timer to fallback to IDLE
-                else fifo_write_state <= READY_S1;
+                else fifo_write_state <= IDLE_S1;
             end
 
             WR_FIFO_S1: begin
@@ -125,10 +126,12 @@ always @(posedge clk or negedge aresetn) begin
                     fifo_data_in <= pktin_data[511:0];
                     fifo_wr_en <= 1'b1;    
                     //use pktin_md_en to mark last segment.
-                    if(pkt_in_md_en) begin
+                    if(pkt_in_md_en && pktin_data[519:518] == 2'b01)) begin
                         fifo_write_state <= IDLE_S1;
                     end
                 end
+                //in case there is a bible.
+                //TODO: how to deal with fifo full?
                 else begin
                     fifo_wr_en <= 1'b0;
                 end
@@ -143,7 +146,7 @@ end
 assign M_AXI_AWID         = 1'b0;
 assign M_AXI_AWADDR[31:0] = ddr_wr_addr[31:0];
 assign M_AXI_AWLEN[7:0]   = ddr_wr_len[7:0];
-assign M_AXI_AWSIZE[2:0]  = 3'b010;
+assign M_AXI_AWSIZE[2:0]  = 3'b010;  //4B for each transfer
 assign M_AXI_AWBURST[1:0] = 2'b01;
 assign M_AXI_AWLOCK       = 1'b0;
 assign M_AXI_AWCACHE[3:0] = 4'b0011;
@@ -228,7 +231,7 @@ always @(posedge clk or negedge aresetn) begin
             end
 
             WD_PROC_S2: begin
-                if(M_AXI_WREADY) begin
+                if(M_AXI_WREADY && ~fifo_empty) begin
                     ddr_wr_wvalid <= 1'b1;
                     ddr_data_out[31:0] <= fifo_to_axi_data_w[32*segment_cursor +: 32];
                     if(segment_cursor == 4'd15) begin
@@ -279,10 +282,10 @@ end
 fifo_512w_32d ddr_write_fifo (
   .clk(clk),                  // input wire clk
   .srst(~aresetn),                // input wire srst
-  .din(fifo_data_in),              // input wire [704 : 0] din
+  .din(fifo_data_in),              // input wire [511 : 0] din
   .wr_en(fifo_wr_en),              // input wire wr_en
   .rd_en(fifo_rd_en),              // input wire rd_en
-  .dout(fifo_data_out),            // output wire [704 : 0] dout
+  .dout(fifo_data_out),            // output wire [511 : 0] dout
   .full(fifo_full),                // output wire full
   .empty(fifo_empty),              // output wire empty
   .wr_rst_busy(),         // output wire wr_rst_busy

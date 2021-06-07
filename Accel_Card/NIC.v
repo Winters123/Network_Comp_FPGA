@@ -31,6 +31,8 @@ input      SFP_RXP,
 output     SFP_TXN,
 output     SFP_TXP
 
+
+
 );
 
 wire	sys_clk;   
