@@ -1,4 +1,7 @@
-module miniSoC (
+module miniSoC #(
+    parameter AXIS_DATA_WIDTH = 8,
+    parameter AXIS_KEEP_WIDTH = 1
+)(
 //system clock & resets
     input       wire            i_sys_clk,  // 50MHz
     input       wire            i_sys_rst_n,
@@ -21,22 +24,154 @@ module miniSoC (
     output[2:0]                      tmds_data_n,             //HDMI differential data negative
 // HDMI
 
-// MAC
-	//input port
-	input		[7:0]			m_axis_rx_tdata			,//send packet
-	input						m_axis_rx_tvalid		,//send valid
-	input						m_axis_rx_tlast			,//send valid write
-	input						m_axis_rx_tuser			,//receive allmostfull	
-
-	//output port			
-	output	wire	[7:0]		s_axis_tx_tdata	    			,//send packet
-	output	wire				s_axis_tx_tvalid	    		,//send write
-	output	wire				s_axis_tx_tlast	    			,//send valid
-	output	wire				s_axis_tx_tuser    				,//send valid write
-	input						s_axis_tx_tready			 	//receive allmostfull		
-// MAC
+// rgmii interface
+    output              e_mdc,                           //phy emdio clock
+    inout               e_mdio,                          //phy emdio data
+    output[3:0]         rgmii_txd,                       //phy data send
+    output              rgmii_txctl,                     //phy data send control
+    output              rgmii_txc,                       //Clock for sending data //125MHz for 1000M
+    input [3:0]         rgmii_rxd,                       //recieve data
+    input               rgmii_rxctl,                     //Control signal for receiving data
+    input               rgmii_rxc                        //Clock for recieving data
+// rgmii interface	
 );
     
+/*
+ * AXI input
+ */
+wire [AXIS_DATA_WIDTH-1:0] tx_axis_tdata,
+wire [AXIS_KEEP_WIDTH-1:0] tx_axis_tkeep,
+wire                       tx_axis_tvalid,
+wire                       tx_axis_tready,
+wire                       tx_axis_tlast,
+wire                       tx_axis_tuser,
+/*
+ * AXI output
+ */
+wire [AXIS_DATA_WIDTH-1:0] rx_axis_tdata,
+wire [AXIS_KEEP_WIDTH-1:0] rx_axis_tkeep,
+wire                       rx_axis_tvalid,
+wire                       rx_axis_tready,
+wire                       rx_axis_tlast,
+wire                       rx_axis_tuser,
+
+wire gmii_rx_clk;
+wire gmii_tx_clk_s;
+
+assign gmii_tx_clk_s  = gmii_rx_clk;
+
+BUFG bufmr_rgmii_rxc(
+  .I(~rgmii_rxc),
+  .O(gmii_rx_clk)
+);
+
+reg tx_reset_d1, tx_reset_sync;
+
+always @(posedge gmii_tx_clk_s) begin
+  tx_reset_d1    <= reset;
+  tx_reset_sync  <= tx_reset_d1;
+end
+
+ODDR #(
+  .DDR_CLK_EDGE("SAME_EDGE")
+) rgmii_txc_out (
+  .Q (rgmii_txc),
+  .C (gmii_tx_clk_s),
+  .CE(1),
+  .D1(1),
+  .D2(0),
+  .R(tx_reset_sync),
+  .S(0)
+);
+
+eth_mac_1g_rgmii_fifo #
+(
+    // target ("SIM", "GENERIC", "XILINX", "ALTERA")
+    .TARGET("XILINX"),
+    // IODDR style ("IODDR", "IODDR2")
+    // Use IODDR for Virtex-4, Virtex-5, Virtex-6, 7 Series, Ultrascale
+    // Use IODDR2 for Spartan-6
+    .IODDR_STYLE("IODDR"),
+    // Clock input style ("BUFG", "BUFR", "BUFIO", "BUFIO2")
+    // Use BUFR for Virtex-5, Virtex-6, 7-series
+    // Use BUFG for Ultrascale
+    // Use BUFIO2 for Spartan-6
+    .CLOCK_INPUT_STYLE("BUFR"),
+    // Use 90 degree clock for RGMII transmit ("TRUE", "FALSE")
+    .USE_CLK90("TRUE"),
+    .AXIS_DATA_WIDTH(AXIS_DATA_WIDTH),
+    .AXIS_KEEP_ENABLE(),
+    .AXIS_KEEP_WIDTH (AXIS_KEEP_WIDTH),
+    .ENABLE_PADDING(1),
+    .MIN_FRAME_LENGTH(64),
+    .TX_FIFO_DEPTH(),
+    .TX_FIFO_PIPELINE_OUTPUT(2),
+    .TX_FRAME_FIFO(1),
+    .TX_DROP_BAD_FRAME(),
+    .TX_DROP_WHEN_FULL(0),
+    .RX_FIFO_DEPTH(),
+    .RX_FIFO_PIPELINE_OUTPUT(),
+    .RX_FRAME_FIFO(1),
+    .RX_DROP_BAD_FRAME(),
+    .RX_DROP_WHEN_FULL()
+)rgmii_mac_1g
+(
+    .gtx_clk(rgmii_txc),  //use 125Mhz
+    .gtx_clk90(rgmii_txc),
+    .gtx_rst(tx_reset_sync),
+    .logic_clk(i_sys_clk),
+    .logic_rst(i_sys_rst_n),
+
+    /*
+     * AXI input
+     */
+    .tx_axis_tdata(tx_axis_tdata),
+    .tx_axis_tkeep(tx_axis_tkeep),
+    .tx_axis_tvalid(tx_axis_tvalid),
+    .tx_axis_tready(tx_axis_tready),
+    .tx_axis_tlast(tx_axis_tlast),
+    .tx_axis_tuser(tx_axis_tuser),
+
+    /*
+     * AXI output
+     */
+    .rx_axis_tdata(rx_axis_tdata),
+    .rx_axis_tkeep(rx_axis_tkeep),
+    .rx_axis_tvalid(rx_axis_tvalid),
+    .rx_axis_tready(rx_axis_tready),
+    .rx_axis_tlast(rx_axis_tlast),
+    .rx_axis_tuser(rx_axis_tuser),
+
+    /*
+     * RGMII interface
+     */
+    .rgmii_rx_clk(rgmii_rxc),
+    .rgmii_rxd(rgmii_rxd),
+    .rgmii_rx_ctl(rgmii_rxctl),
+    .rgmii_tx_clk(rgmii_txc),
+    .rgmii_txd(rgmii_txd),
+    .rgmii_tx_ctl(rgmii_txctl),
+
+    /*
+     * Status
+     */
+    .tx_error_underflow(),
+    .tx_fifo_overflow(),
+    .tx_fifo_bad_frame(),
+    .tx_fifo_good_frame(),
+    .rx_error_bad_frame(),
+    .rx_error_bad_fcs(),
+    .rx_fifo_overflow(),
+    .rx_fifo_bad_frame(),
+    .rx_fifo_good_frame(),
+    .speed(),
+
+    /*
+     * Configuration
+     */
+    .ifg_delay()
+);
+
 wire	[519:0]	TF_8to512_out			;
 wire			TF_8to512_out_wr		;
 wire	[111:0] TF_8to512_out_valid		;
@@ -48,6 +183,8 @@ wire			TF_512to8_in_wr			;
 wire	[111:0] TF_512to8_in_valid		;
 wire			TF_512to8_in_valid_wr	;
 wire			TF_512to8_out_alf		;
+
+
 TF_8to512 TF_8to512_inst_io_card(
 	.clk					(i_sys_clk					),
 	.rst_n					(i_sys_rst_n				),
@@ -58,10 +195,10 @@ TF_8to512 TF_8to512_inst_io_card(
 	.TF_8to512_out_valid_wr	(TF_8to512_out_valid_wr		),
 	.TF_8to512_in_alf		(TF_8to512_in_alf			),
 	
-	.m_axis_rx_tdata		(m_axis_rx_tdata			),
-	.m_axis_rx_tlast		(m_axis_rx_tlast			),
-	.m_axis_rx_tuser		(m_axis_rx_tuser			),
-	.m_axis_rx_tvalid		(m_axis_rx_tvalid		    ) 
+	.m_axis_rx_tdata		(rx_axis_tdata			),
+	.m_axis_rx_tlast		(rx_axis_tlast			),
+	.m_axis_rx_tuser		(rx_axis_tuser			),
+	.m_axis_rx_tvalid		(rx_axis_tvalid		    ) 
 );
 
 wire	[519:0]	o_dpkt_data    			;
@@ -157,7 +294,7 @@ CTRLPKT2COMMAND	CTRLPKT2COMMAND_inst(
 	.com_out_cnt				(command_out_cnt				)//command out cnt
 );
 
-//=============================接收命令，控制数据读�?===============================================//
+//=============================接收命令，控制数据读�?===============================================//
 cms_covert  u_cms_covert (
     .i_sys_clk               ( i_sys_clk            ),
     .i_sys_rst_n             ( i_sys_rst_n          ),
@@ -254,11 +391,11 @@ TF_512to8 TF_512to8_inst(
 	.clk					(sys_clk					),
 	.rst_n					(reset						),
 	
-	.s_axis_tx_tready		(sg_s_axis_tx_tready		),
-	.s_axis_tx_tdata		(sg_s_axis_tx_tdata			),
-	.s_axis_tx_tlast		(sg_s_axis_tx_tlast			),
-	.s_axis_tx_tuser		(sg_s_axis_tx_tuser			),
-	.s_axis_tx_tvalid		(sg_s_axis_tx_tvalid		),
+	.s_axis_tx_tready		(tx_axis_tready		),
+	.s_axis_tx_tdata		(tx_axis_tdata			),
+	.s_axis_tx_tlast		(tx_axis_tlast			),
+	.s_axis_tx_tuser		(tx_axis_tuser			),
+	.s_axis_tx_tvalid		(tx_axis_tvalid		),
 	
 	.TF_512to8_in			(TF_512to8_in				),
 	.TF_512to8_in_wr		(TF_512to8_in_wr			),
@@ -271,7 +408,7 @@ TF_512to8 TF_512to8_inst(
 
 
 
-//================ 以下是�?�过PREPARSER 后分配至HDMI显示的数据报文信�? ==========================================//
+//================ 以下是�?�过PREPARSER 后分配至HDMI显示的数据报文信�? ==========================================//
 // pixel_buffer Outputs
     wire  pixelclk;         // 25.2MHz
     wire  pixelclk5x;       // 126MHz
@@ -326,7 +463,7 @@ pixel_buffer  u_pixel_buffer (
 dvi_encoder  u_dvi_encoder (
     .pixelclk                ( pixelclk      ),
     .pixelclk5x              ( pixelclk5x    ),
-    .rstin                   ( ~i_sys_rst_n  ),// 高电平有�?
+    .rstin                   ( ~i_sys_rst_n  ),// 高电平有�?
     .blue_din                ( hdmi_b        ),
     .green_din               ( hdmi_g        ),
     .red_din                 ( hdmi_r        ),
