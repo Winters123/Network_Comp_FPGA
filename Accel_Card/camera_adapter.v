@@ -49,7 +49,7 @@ module camera_adaptor(
     input [1:0]            M_AXI_BRESP,
     input [0:0]            M_AXI_BUSER,
     input                  M_AXI_BVALID,
-    output                 M_AXI_BREADY,
+    output                 M_AXI_BREADY
     
 );
 
@@ -126,7 +126,7 @@ always @(posedge clk or negedge aresetn) begin
                     fifo_data_in <= pktin_data[511:0];
                     fifo_wr_en <= 1'b1;    
                     //use pktin_md_en to mark last segment.
-                    if(pkt_in_md_en && pktin_data[519:518] == 2'b01)) begin
+                    if(pkt_in_md_en && pktin_data[519:518] == 2'b01) begin
                         fifo_write_state <= IDLE_S1;
                     end
                 end
@@ -180,7 +180,7 @@ always @(posedge clk or negedge aresetn) begin
     if(~aresetn) begin
         ddr_wr_addr <= 32'b0;
         ddr_wr_len[7:0] <= 8'd0;
-        ddr_awvalid <= 1'b0;
+        //ddr_awvalid <= 1'b0;
         ddr_wr_awvalid <= 1'b0;
         ddr_wr_wlast <= 1'b0;
         
@@ -195,6 +195,7 @@ always @(posedge clk or negedge aresetn) begin
     else begin
         case(fifo_read_state)
             IDLE_S2: begin
+                fifo_rd_en <= 1'b0;
                 if(~fifo_empty && ddr_write_start && ddr_write_start_valid) begin
                     fifo_read_state <=WA_WD_START_S2;
                     ddr_wr_awvalid <= 1'b1;
@@ -211,7 +212,6 @@ always @(posedge clk or negedge aresetn) begin
                     ddr_wr_awvalid <= 1'b0;
                     ddr_wr_wlast <= 1'b0;
 
-                    fifo_rd_en <= 1'b0;
                     fifo_read_state <= IDLE_S2;
                     //start over again
                     if(frame_4B_cursor == 14'b0) ddr_wr_addr <= 32'b0;
@@ -227,7 +227,7 @@ always @(posedge clk or negedge aresetn) begin
                     segment_cursor <= segment_cursor + 4'b1;
                     fifo_read_state <= WD_PROC_S2;
                 end
-                fifo_read_state <= WA_WD_START_S2;
+                else fifo_read_state <= WA_WD_START_S2;
             end
 
             WD_PROC_S2: begin
@@ -238,9 +238,11 @@ always @(posedge clk or negedge aresetn) begin
                         segment_cursor <= 4'b0;
                         ddr_wr_wlast <= 1'b1;
                         fifo_read_state <= WD_WAIT_S2;
+                        fifo_rd_en <= 1'b1;
                     end
                     else begin
                         segment_cursor <= segment_cursor + 4'b1;
+                        fifo_rd_en <= 1'b0;
                         fifo_read_state <= WD_PROC_S2;
                     end
                 end
@@ -251,13 +253,14 @@ always @(posedge clk or negedge aresetn) begin
             end
             WD_WAIT_S2: begin
                 if(M_AXI_WREADY) begin
+                    fifo_rd_en <= 1'b0;
                     ddr_wr_wvalid <= 1'b0;
                     ddr_wr_wlast <= 1'b0;
                     fifo_read_state <= WR_WAIT_S2;
                 end            
             end
             WR_WAIT_S2: begin
-                if(M_AXI_BVALID && M_AXI_BRESP == 2'b00) begin
+                if(M_AXI_BVALID && (M_AXI_BRESP == 2'b00)) begin
                     fifo_read_state <= WR_DONE_S2;
                 end
                 else fifo_read_state <= WR_WAIT_S2;
@@ -265,8 +268,19 @@ always @(posedge clk or negedge aresetn) begin
 
             WR_DONE_S2: begin
                 //cursor move forward once or reset to zero.
-                if(frame_4B_cursor != 14'd9599) frame_4B_cursor <= frame_4B_cursor + 14'b1;
-                else frame_4B_cursor <= 14'b0;
+                if(frame_4B_cursor != 14'd9599) begin
+                    frame_4B_cursor <= frame_4B_cursor + 14'b1;
+                    fifo_read_state <= IDLE_S2;
+                end 
+                else if(ddr_write_finish_ready) begin
+                    frame_4B_cursor <= 14'b0;
+                    ddr_write_finish <= 1'b1;
+                    ddr_write_finish_valid <= 1'b1;
+                    fifo_read_state <= IDLE_S2;
+                end
+                else begin
+                    fifo_read_state <= WR_DONE_S2;
+                end
             end
             
         endcase
@@ -285,11 +299,9 @@ fifo_512w_32d ddr_write_fifo (
   .din(fifo_data_in),              // input wire [511 : 0] din
   .wr_en(fifo_wr_en),              // input wire wr_en
   .rd_en(fifo_rd_en),              // input wire rd_en
-  .dout(fifo_data_out),            // output wire [511 : 0] dout
+  .dout(fifo_to_axi_data_w),            // output wire [511 : 0] dout
   .full(fifo_full),                // output wire full
-  .empty(fifo_empty),              // output wire empty
-  .wr_rst_busy(),         // output wire wr_rst_busy
-  .rd_rst_busy()          // output wire rd_rst_busy
+  .empty(fifo_empty)              // output wire empty
 );
 
 

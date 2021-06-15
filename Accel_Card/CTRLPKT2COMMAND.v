@@ -112,8 +112,8 @@ always@(posedge Clk or negedge Reset_N)
 	always @(posedge Clk or negedge Reset_N) if (!Reset_N) pkt_in_cnt			<= 32'b0; else if (IFE_ctrlpkt_in_valid_wr == 1'b1	)	pkt_in_cnt 			<= pkt_in_cnt +1'b1; 			else pkt_in_cnt 		<= pkt_in_cnt;		//tmp is used to restore cnt
 	always @(posedge Clk or negedge Reset_N) if (!Reset_N) com_out_cnt			<= 32'b0; else if (Command_wr == 1'b1				)	com_out_cnt 		<= com_out_cnt +1'b1; 			else com_out_cnt 		<= com_out_cnt;		//tmp is used to restore cnt
 
-	SYNCFIFO_128X520 scfifo_520_128_FIFO(
-			.srst					(~Reset_N						),	//Reset the all signal, active high
+	SYNCFIFO_128x520 scfifo_520_128_FIFO(
+			.rst					(~Reset_N						),	//Reset the all signal, active high
 			.din					(IFE_ctrlpkt_in					),	//The Inport of data 
 			.rd_en					(IFE_ctrlpkt_in_rd				),	//active-high
 			.clk					(Clk							),	//ASYNC WriteClk, SYNC use wrclk
@@ -123,7 +123,7 @@ always@(posedge Clk or negedge Reset_N)
 	);
 //metadata buffer
 	SYNCFIFO_128x256 scfifo_256_128_FIFO(
-			.srst					(~Reset_N						),	//Reset the all signal, active high
+			.rst					(~Reset_N						),	//Reset the all signal, active high
 			.din					(IFE_ctrlpkt_in_valid			),	//The Inport of data 
 			.rd_en					(IFE_ctrlpkt_in_valid_rd		),	//active-high
 			.clk					(Clk							),	//ASYNC WriteClk, SYNC use wrclk

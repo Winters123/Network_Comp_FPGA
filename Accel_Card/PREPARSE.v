@@ -24,6 +24,8 @@ module PREPARSE
  ,input     wire                i_sys_rst_n                     //rst of sys_clk
 //=========================================== Input ARI  ==========================================//
 
+ ,input     wire                rd_sys_clk                       //system clk
+ ,input     wire                rd_sys_rst_n                     //rst of sys_clk
 //input pkt data form application(ARI)
 ,input     wire    [519:0]      i_ari_data                     	//[519:518]:10 head \ 00 body \ 01 tail\,[517:512]:invalid bytes,[511:0],data
 ,input     wire                 i_ari_data_en                  	//data enable
@@ -122,8 +124,8 @@ assign  o_ari_fifo_alf    =   w_ari_data_wrusedw[6]   ;
 assign w_mac_match        =  (w_ari_data_q[511:464] == i_nacpc_mac)    ?  1'b1 :   1'b0  ;
 //=========================================== function always block ========================================//
 
-always @(posedge i_sys_clk or negedge i_sys_rst_n)begin
-    if(!i_sys_rst_n) begin
+always @(posedge rd_sys_clk or negedge rd_sys_rst_n)begin
+    if(!rd_sys_rst_n) begin
         o_dpkt_data        	<=  520'b0   		;
         o_dpkt_data_en     	<=  1'b0     		;
         o_dpkt_meta        	<=  112'b0   		;
@@ -679,27 +681,31 @@ always @(posedge i_sys_clk or negedge i_sys_rst_n)begin
 end
 `endif
 
-SYNCFIFO_128X520 ari_data_fifo(
-			.srst				(~i_sys_rst_n					),
+ASYNCFIFO_128x520 ari_data_fifo(
+			.wr_rst				(~i_sys_rst_n					),
+			.rd_rst				(~rd_sys_rst_n					),
 			.din				(i_ari_data 					),
 			.rd_en				(r_ari_data_rd				    ),
-			.clk				(i_sys_clk						),
+			.wr_clk				(i_sys_clk						),
+			.rd_clk				(rd_sys_clk						),
 			.wr_en				(i_ari_data_en  				),
 			.dout				(w_ari_data_q   				),
 			.empty				(w_ari_data_rdempty             ),
-			.data_count			(w_ari_data_wrusedw             )
+			.wr_data_count		(w_ari_data_wrusedw             )
 );
 
-SYNCFIFO_128x112 ari_info_fifo(
-			.srst				(~i_sys_rst_n					),
+ASYNCFIFO_128x112 ari_info_fifo(
+			.wr_rst				(~i_sys_rst_n					),
+			.rd_rst				(~rd_sys_rst_n					),			
 			.din				(i_ari_info					    ),
 			.rd_en				(r_ari_info_rd				    ),
-			.clk				(i_sys_clk						),
+			.wr_clk				(i_sys_clk						),
+			.rd_clk				(rd_sys_clk						),
 			.wr_en				(i_ari_info_en				    ),
 			.dout				(w_ari_info_q				    ),
 			.empty				(w_ari_info_rdempty             ),
             .almost_empty		(w_ari_info_rdalempty   		),
-			.data_count			(w_ari_info_wrusedw             )			
+			.wr_data_count		(w_ari_info_wrusedw             )			
 );
 
 

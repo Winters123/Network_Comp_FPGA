@@ -13,8 +13,7 @@
 
 module tri_eth_test (
 //clk
-input           FPGA_REFCLK_P,
-input           FPGA_REFCLK_N,//125Mhz
+input           FPGA_CLK,
 //rst
 input 			FPGA_RESET_N,//FPGA_RESET
 //gmii_port
@@ -34,45 +33,39 @@ input 			FPGA_RESET_N,//FPGA_RESET
   output  wire         gmii_gtxclk_1
 );
 
-wire	usr_clk			;	//125Mhz
-wire    Port_clk		;	//125Mhz
-wire    GMII_ref_clk	;	//200Mhz
+wire	usr_clk			;
+wire    config_clk	    ;
+wire    Port_clk		;
+wire    GMII_ref_clk	;
 wire	locked			;
 wire	reset			;
 
 
 clk_wiz_0  clk_wiz_0(
  // Clock out ports
-.clk_out1(usr_clk		),
-.clk_out3(Port_clk		),
-.clk_out2(GMII_ref_clk	),
+.clk_out1(usr_clk		),//125Mhz
+//.clk_out2(config_clk	),
+.clk_out3(Port_clk		),//125Mhz
+.clk_out2(GMII_ref_clk	),//200Mhz
  // Status and control signals
 .reset(!FPGA_RESET_N),
 .locked(locked),
 // Clock in ports
-.clk_in1_p(FPGA_REFCLK_P ),
-.clk_in1_n(FPGA_REFCLK_N));
+.clk_in1(FPGA_CLK ));//125Mhz
 
-assign reset = locked & FPGA_RESET_N	;
+assign reset = locked 	;
 
 
 GMII_TRI_ETH_TOP  PORT0_GMII
 (
-	.i_sys_clk					(usr_clk								),				//system clk
+	.i_sys_clk					(usr_clk								),					//system clk
 	.i_sys_rst_n				(reset									),				//rst of sys_clk
-	.clk_csr_i					(usr_clk								),				//CSR clk,----25-300MHz!!!!
+	.clk_csr_i					(usr_clk								),					//CSR clk,----25-300MHz!!!!
 	.rst_clk_csr_n				(reset									),				//active low reset synch to clk_csr_i
 	.clk_tx_i					(Port_clk								),					//GMII transmit reference clock,all port share the transmit clock
 	.rst_clk_tx_n				(reset									),				//active low reset synch to clk_tx_i
 	.tri_refclk_i				(GMII_ref_clk							),				//TRI reference clock
 
-//===================================== LocalBus port command =====================================//
-	.LocalBus_command_wr		(1'b0									),		//LocalBus command wirte	
-	.LocalBus_command			(64'b0									),			//LocalBus command
-	.LocalBus_allmostfull		(										),		//LocalBus allmostfull
-	.NextLocalBus_command_wr	(										),	//LocalBus command wirte	
-	.NextLocalBus_command		(										),		//LocalBus command
-	.NextLocalBus_allmostfull	(1'b0									),	//LocalBus allmostfull	
 //=========================================== ARI & ATI =========================================//
 
 // GMII Interface

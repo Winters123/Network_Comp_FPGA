@@ -1,7 +1,5 @@
-`timescale 1ps /1ns
-module controller #(
 
-) (
+module controller(
     input clk,
     input aresetn,
 
@@ -72,7 +70,7 @@ always @(posedge clk or negedge aresetn) begin
     end
 
     else begin
-        case(ctrl_state) begin
+        case(ctrl_state) 
             IDLE_C: begin
                 if(start_all || (ddr_read_finish && ddr_read_finish_valid)) begin
                     //trigger remote camera
@@ -129,10 +127,7 @@ always @(posedge clk or negedge aresetn) begin
                     ddr_read_finish_ready <= 1'b1;
                 end
             end
-        end
-    end
-    else begin
-        
+        endcase
     end
 end
 

@@ -606,8 +606,8 @@ assign  w_ari_info_en[3]    =   i_ari_3_info_en     ;
 
 genvar i;
 generate for(i = 0; i<=3; i = i + 1) begin:ARI_FIFO_GROUP
-SYNCFIFO_128X520 ari_data_fifo(
-			.srst					(~i_sys_rst_n					),
+SYNCFIFO_128x520 ari_data_fifo(
+			.rst					(~i_sys_rst_n					),
 			.din					(w_ari_data[i]					),
 			.rd_en					(r_ari_data_rd[i]				),
 			.clk					(i_sys_clk						),
@@ -618,7 +618,7 @@ SYNCFIFO_128X520 ari_data_fifo(
 );
 
 SYNCFIFO_128x112 ari_info_fifo(
-			.srst					(~i_sys_rst_n					),
+			.rst					(~i_sys_rst_n					),
 			.din					(w_ari_info[i]					),
 			.rd_en					(r_ari_info_rd[i]				),
 			.clk					(i_sys_clk						),

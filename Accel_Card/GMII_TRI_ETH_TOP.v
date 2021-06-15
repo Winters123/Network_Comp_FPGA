@@ -97,10 +97,16 @@ output	wire	[0:0]	mac_speed_0_o				//Speed select output for MAC
 //(*MARK_DEBUG="true"*) reg [31:0] axi_byte_outcnt;
 
 
+wire	[7:0]	tx_axis_mac_tdata0		;	
+wire            tx_axis_mac_tlast0		;	
+wire            tx_axis_mac_tuser0		;	
+wire            tx_axis_mac_tvalid0		;
+wire			tx_axis_mac_tready0     ;
+
 //always@(posedge gmii_tx_clk or negedge rst_clk_tx_n) if(!rst_clk_tx_n)  gmii_byte_outcnt  <= 16'b0; else if(gmii_tx_en) gmii_byte_outcnt  <= gmii_byte_outcnt  + 16'b1; else gmii_byte_outcnt  <= gmii_byte_outcnt;
 //always@(posedge tx_mac_aclk or posedge tx_reset) if(tx_reset)  axi_byte_outcnt <= 32'b0; else if(tx_statistics_valid) axi_byte_outcnt <= axi_byte_outcnt + {18'b0,tx_statistics_vector[18:5]}; else axi_byte_outcnt <= axi_byte_outcnt;
 
-tri_mode_ethernet_mac tri_mode_ethernet_mac_inst (
+tri_mode_ethernet_mac_0 tri_mode_ethernet_mac_inst (
   .gtx_clk(clk_tx_i),                                 // input wire gtx_clk
   .glbl_rstn(rst_clk_csr_n),                          // input wire glbl_rstn
   .rx_axi_rstn(rst_clk_tx_n),                         // input wire rx_axi_rstn
@@ -120,11 +126,11 @@ tri_mode_ethernet_mac tri_mode_ethernet_mac_inst (
   .tx_mac_aclk(tx_mac_aclk),                          // output wire tx_mac_aclk
   .tx_reset(tx_reset),                                // output wire tx_reset
   .tx_enable(tx_enable),                              // output wire tx_enable
-  .tx_axis_mac_tdata(tx_axis_mac_tdata),              // input wire [7 : 0] tx_axis_mac_tdata
-  .tx_axis_mac_tvalid(tx_axis_mac_tvalid),            // input wire tx_axis_mac_tvalid
-  .tx_axis_mac_tlast(tx_axis_mac_tlast),              // input wire tx_axis_mac_tlast
-  .tx_axis_mac_tuser(tx_axis_mac_tuser),              // input wire [0 : 0] tx_axis_mac_tuser
-  .tx_axis_mac_tready(tx_axis_mac_tready),            // output wire tx_axis_mac_tready
+  .tx_axis_mac_tdata(tx_axis_mac_tdata0),              // input wire [7 : 0] tx_axis_mac_tdata
+  .tx_axis_mac_tvalid(tx_axis_mac_tvalid0),            // input wire tx_axis_mac_tvalid
+  .tx_axis_mac_tlast(tx_axis_mac_tlast0),              // input wire tx_axis_mac_tlast
+  .tx_axis_mac_tuser(tx_axis_mac_tuser0),              // input wire [0 : 0] tx_axis_mac_tuser
+  .tx_axis_mac_tready(tx_axis_mac_tready0),            // output wire tx_axis_mac_tready
   .pause_req(pause_req),                              // input wire pause_req
   .pause_val(pause_val),                              // input wire [15 : 0] pause_val
   .refclk(tri_refclk_i),                              // input wire refclk
@@ -143,18 +149,20 @@ tri_mode_ethernet_mac tri_mode_ethernet_mac_inst (
   .tx_configuration_vector({16'h3,32'h22223333,32'h00002006})  // input wire [79 : 0] tx_configuration_vector
 );
 
+wire    m_axis_rx_alf                   ;
 
 wire	[519:0]	TF_8to512_out			;
 wire			TF_8to512_out_wr		;
-wire	[255:0] TF_8to512_out_valid		;
+wire	[111:0] TF_8to512_out_valid		;
 wire			TF_8to512_out_valid_wr	;
 wire			TF_8to512_in_alf       ;
 
 wire	[519:0]	TF_512to8_in			;
 wire			TF_512to8_in_wr			;
-wire	[255:0] TF_512to8_in_valid		;
+wire	[111:0] TF_512to8_in_valid		;
 wire			TF_512to8_in_valid_wr	;
 wire			TF_512to8_out_alf		;
+
 
 
 TF_8to512 TF_8to512_inst(
@@ -175,10 +183,12 @@ TF_8to512 TF_8to512_inst(
 
 
 TF_512to8 TF_512to8_inst(
-	.clk					(tx_mac_aclk				),
-	.rst_n					(~tx_reset					),
+	.wr_clk					(i_sys_clk					),
+	.rd_clk					(tx_mac_aclk				),
+	.wr_rst_n				(i_sys_rst_n				),
+	.rd_rst_n				(~tx_reset					),
 	
-	.s_axis_tx_tready		(tx_axis_mac_tready			),
+	.s_axis_tx_alf			(m_axis_rx_alf				),
 	.s_axis_tx_tdata		(tx_axis_mac_tdata			),
 	.s_axis_tx_tlast		(tx_axis_mac_tlast			),
 	.s_axis_tx_tuser		(tx_axis_mac_tuser			),
@@ -191,7 +201,24 @@ TF_512to8 TF_512to8_inst(
 	.TF_512to8_out_alf		(TF_512to8_out_alf			) 
 );
 
+gmii_test_pkt	gmii_test_pkt_inst(
+	.rdclk				(tx_mac_aclk				),
+	.rd_reset			(~rx_reset					),
+	.wrclk				(tx_mac_aclk				),
+	.wr_reset			(~rx_reset					),
 
+	.s_axis_tx_tready	(tx_axis_mac_tready0		),
+	.s_axis_tx_tdata	(tx_axis_mac_tdata0			),
+	.s_axis_tx_tlast	(tx_axis_mac_tlast0			),
+	.s_axis_tx_tuser	(tx_axis_mac_tuser0			),
+	.s_axis_tx_tvalid	(tx_axis_mac_tvalid0		),
+
+	.m_axis_rx_tdata	(tx_axis_mac_tdata			),
+	.m_axis_rx_tlast	(tx_axis_mac_tlast			),
+	.m_axis_rx_tuser	(tx_axis_mac_tuser			),
+	.m_axis_rx_tvalid	(tx_axis_mac_tvalid			), 
+	.s_axis_rx_alf		(m_axis_rx_alf				) 
+);
 
 wire	[519:0]	o_dpkt_data    			;
 wire			o_dpkt_data_en 			;
@@ -213,6 +240,10 @@ PREPARSE PREPARSE
 //system clock & resets
   .i_sys_clk                 	(rx_mac_aclk				)//system clk
  ,.i_sys_rst_n               	(~rx_reset					)//rst of sys_clk
+ 
+ ,.rd_sys_clk                   (i_sys_clk					)//system clk 
+ ,.rd_sys_rst_n                 (i_sys_rst_n				)//rst of sys_clk  
+ 
 //=========================================== Input ARI  ==========================================//
 
 //input pkt data form application(ARI)
@@ -268,8 +299,8 @@ PREPARSE PREPARSE
 	
 CTRLPKT2COMMAND	CTRLPKT2COMMAND_inst(
 //=========================================== clk & rst ===========================================//
-	.Clk						(rx_mac_aclk				),//clock, this is synchronous clock
-	.Reset_N					(~rx_reset					),//Reset the all signal, active high
+	.Clk						(i_sys_clk						),//clock, this is synchronous clock
+	.Reset_N					(i_sys_rst_n					),//Reset the all signal, active high
 //=========================================== frame from IFE ===========================================//
 	.IFE_ctrlpkt_in				(o_cpkt_data       				),//receive pkt
 	.IFE_ctrlpkt_in_wr			(o_cpkt_data_en    				),//receive pkt write singal
@@ -279,7 +310,7 @@ CTRLPKT2COMMAND	CTRLPKT2COMMAND_inst(
 //======================================= command to the config path ==================================//
 	.Command_wr					(gmii_command_wr				),//command write signal
 	.Command					(gmii_command					),//command [63:61] 101:frist 111:middle 110:end 100:frist&end [60]1:succeed 0:fail  [59] 0:read 1:write [58:52]MDID [51:32] address [31:0] data
-	.Command_alf				(1'b0							),//commadn almostful
+	.Command_alf				(gmii_command_alf				),//commadn almostful
 //=================================== counter & debug ====================================//
 	.pkt_in_cnt					(command_pkt_in_cnt				),//pkt input cnt
 	.com_out_cnt				(command_out_cnt				)//command out cnt
@@ -287,8 +318,8 @@ CTRLPKT2COMMAND	CTRLPKT2COMMAND_inst(
 	
 RESULT2CTRLPKT	RESULT2CTRLPKT_inst(
 //=========================================== clk & rst ===========================================//
-	.Clk						(tx_mac_aclk				),//clock, this is synchronous clock
-	.Reset_N					(~tx_reset					),//Reset the all signal, active high
+	.Clk						(i_sys_clk						),//clock, this is synchronous clock
+	.Reset_N					(i_sys_rst_n					),//Reset the all signal, active high
 //=========================================== frame to IFE ===========================================//
 	.IFE_ctrlpkt_out			(IFE_ctrlpkt_out				),//receive pkt
 	.IFE_ctrlpkt_out_wr			(IFE_ctrlpkt_out_wr				),//receive pkt write singal
@@ -315,8 +346,8 @@ POLL_MUX4 POLL_MUX4_inst
 //============================================== clk & rst ===========================================//
 
 //system clock & resets
-  .i_sys_clk                   	(tx_mac_aclk				)//system clk
- ,.i_sys_rst_n                 	(~tx_reset					)//rst of sys_clk
+  .i_sys_clk                   	(i_sys_clk						)//system clk
+ ,.i_sys_rst_n                 	(i_sys_rst_n					)//rst of sys_clk
  
 //=========================================== Input ARI*4  ==========================================//
 
@@ -352,6 +383,5 @@ POLL_MUX4 POLL_MUX4_inst
 ,.o_ari_info_en             	(TF_512to8_in_valid_wr	)//info enable
 ,.i_ari_fifo_alf            	(TF_512to8_out_alf		)//fifo almostfull
 );
-
 
 endmodule
