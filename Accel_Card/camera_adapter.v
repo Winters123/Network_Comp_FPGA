@@ -156,7 +156,7 @@ assign M_AXI_AWUSER[0]    = 1'b1;
 assign M_AXI_AWVALID      = ddr_wr_awvalid;
 
 assign M_AXI_WDATA        = ddr_data_out;
-assign M_AXI_WSTRB[7:0]   = (M_AXI_WVALID & ~fifo_empty)?8'hff:8'h00;
+assign M_AXI_WSTRB[3:0]   = (M_AXI_WVALID & ~fifo_empty)?4'hf:4'h0;
 assign M_AXI_WLAST        = ddr_wr_wlast;
 assign M_AXI_WUSER        = 1'b1;
 assign M_AXI_WVALID       = ddr_wr_wvalid;
