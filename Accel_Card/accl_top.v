@@ -44,60 +44,17 @@ input  	wire	     	gmii_rx_er,
 input  	wire	     	gmii_rx_clk,
 input  	wire	     	mii_tx_clk,
 
-output	wire	[0:0]	mac_speed_0_o,				//Speed select output for MAC
+output	wire	[0:0]	mac_speed_0_o				//Speed select output for MAC
 
-// Master Write Address (unused)
-output [0:0]    	    M_AXI_AWID,
-output [31:0]   	    M_AXI_AWADDR,
-output [7:0]    	    M_AXI_AWLEN,    // Burst Length: 0-255
-output [2:0]    	    M_AXI_AWSIZE,   // Burst Size: Fixed 2'b011
-output [1:0]    	    M_AXI_AWBURST,  // Burst Type: Fixed 2'b01(Incremental Burst)
-output          	    M_AXI_AWLOCK,   // Lock: Fixed 2'b00
-output [3:0]    	    M_AXI_AWCACHE,  // Cache: Fiex 2'b0011
-output [2:0]    	    M_AXI_AWPROT,   // Protect: Fixed 2'b000
-output [3:0]    	    M_AXI_AWQOS,    // QoS: Fixed 2'b0000
-output          	    M_AXI_AWVALID,
-input           	    M_AXI_AWREADY,    
-// Master Write Data (unused)
-output [31:0]     	    M_AXI_WDATA,
-output [7:0]      	    M_AXI_WSTRB,
-output            	    M_AXI_WLAST,
-output            	    M_AXI_WVALID,
-input             	    M_AXI_WREADY,
-// Master Write Response (unused)
-input [0:0]     	    M_AXI_BID,
-input [1:0]     	    M_AXI_BRESP,
-input           	    M_AXI_BVALID,
-output          	    M_AXI_BREADY,
-
-// Master Read Address
-output [0:0]     	    M_AXI_ARID,
-output [31:0]    	    M_AXI_ARADDR,
-output [7:0]     	    M_AXI_ARLEN,
-output [2:0]     	    M_AXI_ARSIZE,
-output [1:0]     	    M_AXI_ARBURST,
-output [1:0]     	    M_AXI_ARLOCK,
-output [3:0]     	    M_AXI_ARCACHE,
-output [2:0]     	    M_AXI_ARPROT,
-output [3:0]     	    M_AXI_ARQOS,
-output           	    M_AXI_ARVALID,
-input            	    M_AXI_ARREADY,
-
-// Master Read Data 
-input [0:0]       	    M_AXI_RID,
-input [31:0]      	    M_AXI_RDATA,
-input [1:0]       	    M_AXI_RRESP,
-input             	    M_AXI_RLAST,
-input             	    M_AXI_RVALID,
-output            	    M_AXI_RREADY
-
-);
+      );
 	  
 
  //     (*MARK_DEBUG="true"*)   reg [7:0] gmii_rx_d_1_reg;
  //     (*MARK_DEBUG="true"*)   reg       gmii_rx_dv_1_reg;
       
-
+ //     always@(posedge i_sys_clk or negedge i_sys_rst_n) if(!i_sys_rst_n)  gmii_rx_d_1_reg  <= 8'b0; else gmii_rx_d_1_reg   <= gmii_txd;
+ //     always@(posedge i_sys_clk or negedge i_sys_rst_n) if(!i_sys_rst_n)  gmii_rx_dv_1_reg <= 1'b0; else gmii_rx_dv_1_reg  <= gmii_tx_en;
+	  
       // asynchronous reset
       wire	                glbl_rstn;
       wire	                rx_axi_rstn;
@@ -317,18 +274,6 @@ PREPARSE PREPARSE
 
 );
 
-//controller related signals
-wire ddr_write_finish;
-wire ddr_write_finish_valid;
-wire ddr_write_finish_ready;
-
-wire odd_even_flag;
-
-wire ddr_write_start;
-wire ddr_write_start_valid;
-wire ddr_write_start_ready;
-
-
 	wire		[63:0]			gmii_command;
 	wire						gmii_command_wr;
 	wire						gmii_command_alf;
@@ -344,253 +289,6 @@ wire ddr_write_start_ready;
 	wire	 	[31:0] 			result_pkt_in_cnt				;//pkt input cnt
 	wire		[31:0]			result_out_cnt					;//command out cnt
 	wire		[31:0]			result_debug_current			;//debug signal
-
-
-// camera_adaptor camera_adaptor(
-//     // Reset, Clock
-//     .aresetn(i_sys_rst_n),
-//     .clk(i_sys_clk),
-
-//     //ctrls from controller
-//     .ddr_write_finish(ddr_write_finish),
-//     .ddr_write_finish_valid(ddr_write_finish_valid),
-//     .ddr_write_finish_ready(ddr_write_finish_ready),
-
-//     .odd_even_flag(odd_even_flag),
-
-//     .ddr_write_start(ddr_write_start),
-//     .ddr_write_start_valid(ddr_write_start_valid),
-//     .ddr_write_start_ready(ddr_write_start_ready),
-
-//     //generate packets
-//     .pktin_data(o_dpkt_data),
-//     .pktin_en(o_dpkt_data_en),
-//     .pkt_in_md(o_dpkt_meta),
-//     .pkt_in_md_en(o_dpkt_meta_en),
-//     .pkt_data_alf(i_dpkt_fifo_alf),
-  
-
-//     // Master Write Address
-//     .M_AXI_AWID(M_AXI_AWID),
-//     .M_AXI_AWADDR(M_AXI_AWADDR),
-//     .M_AXI_AWLEN(M_AXI_AWLEN),    // Burst Length: 0-255
-//     .M_AXI_AWSIZE(M_AXI_AWSIZE),   // Burst Size: Fixed 2'b011
-//     .M_AXI_AWBURST(M_AXI_AWBURST),  // Burst Type: Fixed 2'b01(Incremental Burst)
-//     .M_AXI_AWLOCK(M_AXI_AWLOCK),   // Lock: Fixed 2'b00
-//     .M_AXI_AWCACHE(M_AXI_AWCACHE),  // Cache: Fiex 2'b0011
-//     .M_AXI_AWPROT(M_AXI_AWPROT),   // Protect: Fixed 2'b000
-//     .M_AXI_AWQOS(M_AXI_AWQOS),    // QoS: Fixed 2'b0000
-//     .M_AXI_AWVALID(M_AXI_AWVALID),
-//     .M_AXI_AWREADY(M_AXI_AWREADY),    
-
-//     // Master Write Data
-//     .M_AXI_WDATA(M_AXI_WDATA),
-//     .M_AXI_WSTRB(M_AXI_WSTRB),
-//     .M_AXI_WLAST(M_AXI_WLAST),
-//     .M_AXI_WVALID(M_AXI_WVALID),
-//     .M_AXI_WREADY(M_AXI_WREADY),
-
-//     // Master Write Response
-//     .M_AXI_BID(M_AXI_BID),
-//     .M_AXI_BRESP(M_AXI_BRESP),
-//     .M_AXI_BVALID(M_AXI_BVALID),
-//     .M_AXI_BREADY(M_AXI_BREADY)
-    
-// );
-
-wire 		start_all;
-
-wire 		ddr_read_start;
-wire 		ddr_read_start_valid;
-wire 		ddr_read_start_ready;
-
-wire 		r_write_start;
-wire 		r_write_start_valid;
-wire 		r_write_start_ready;
-
-wire 	    	acc_start;
-wire 			acc_finish;
-wire 			cmd_out_wr;
-wire [63:0]		cmd_out;
-wire 			cmd_out_alf;
-
-
-// controller controller(
-//     .clk(i_sys_clk),
-//     .aresetn(i_sys_rst_n),
-
-//     //from outside
-//     .start_all(1'b1),
-//     //TO MONITOR
-//     .ddr_read_start(ddr_read_start),
-//     .ddr_read_start_valid(ddr_read_start_valid),
-//     .ddr_read_start_ready(ddr_read_start_ready),
-    
-//     //TO CAMERA
-//     .ddr_write_start(ddr_write_start),
-//     .ddr_write_start_valid(ddr_write_start_valid),
-//     .ddr_write_start_ready(ddr_write_start_ready),
-
-//     //FROM MONITOR
-//     .ddr_read_finish(ddr_read_finish),
-//     .ddr_read_finish_valid(ddr_read_finish_valid),
-//     .ddr_read_finish_ready(ddr_read_finish_ready),
-
-//     //FROM CAMERA
-//     .ddr_write_finish(ddr_write_finish),
-//     .ddr_write_finish_valid(ddr_write_finish_valid),
-//     .ddr_write_finish_ready(ddr_write_finish_ready),
-
-//     //TO/FROM ACCEL
-//     .acc_start(acc_start),
-//     .acc_finish(acc_finish),
-//     .cmd_in_wr				(gmii_result_wr				),
-//     .cmd_in					(gmii_result					),
-//     .cmd_in_alf				(gmii_command_alf				),
-
-// //TODO: connect to accel modules && cmd pkt module
-//     .cmd_out_wr(gmii_command_wr),
-// 	.cmd_out(),
-// 	.cmd_out_alf(),
-//     .odd_even_flag(odd_even_flag)
-// );
-
-
-wire	[519:0]	pkt_out_data    			;
-wire			pkt_out_en 					;
-wire	[111:0] pkt_out_md    				;
-wire			pkt_out_md_en 				;
-wire			pkt_out_data_alf			;
-
-
-// monitor_adaptor monitor_adaptor(
-//     // Reset, Clock
-//     .aresetn(i_sys_rst_n),
-//     .clk(i_sys_clk),
-
-//     //ctrls from controller
-//     .ddr_read_finish(ddr_read_finish),
-//     .ddr_read_finish_valid(ddr_read_finish_valid),
-//     .ddr_read_finish_ready(ddr_read_finish_ready),
-//     .odd_even_flag(~odd_even_flag),
-
-//     .ddr_read_start(ddr_read_start),
-//     .ddr_read_start_valid(ddr_read_start_valid),
-//     .ddr_read_start_ready(ddr_read_start_ready),
-
-//     //generate packets
-//     .pkt_out_data(pkt_out_data),
-//     .pkt_out_en(pkt_out_en),
-//     .pkt_out_md(pkt_out_md),
-//     .pkt_out_md_en(pkt_out_md_en),
-//     .pkt_out_data_alf(pkt_out_data_alf),
-  
-
-//     // Master Read Address
-//     .M_AXI_ARID(M_AXI_ARID),
-//     .M_AXI_ARADDR(M_AXI_ARADDR),
-//     .M_AXI_ARLEN(M_AXI_ARLEN),
-//     .M_AXI_ARSIZE(M_AXI_ARSIZE),
-//     .M_AXI_ARBURST(M_AXI_ARBURST),
-//     .M_AXI_ARLOCK(M_AXI_ARLOCK),
-//     .M_AXI_ARCACHE(M_AXI_ARCACHE),
-//     .M_AXI_ARPROT(M_AXI_ARPROT),
-//     .M_AXI_ARQOS(M_AXI_ARQOS),
-//     .M_AXI_ARVALID(M_AXI_ARVALID),
-//     .M_AXI_ARREADY(M_AXI_ARREADY),
-    
-//     // Master Read Data 
-//     .M_AXI_RID(M_AXI_RID),
-//     .M_AXI_RDATA(M_AXI_RDATA),
-//     .M_AXI_RRESP(M_AXI_RRESP),
-//     .M_AXI_RLAST(M_AXI_RLAST),
-//     .M_AXI_RVALID(M_AXI_RVALID),
-//     .M_AXI_RREADY(M_AXI_RREADY)
-    
-// );
-
-
-
-curr_top_adapter curr_top(
-    .clk(i_sys_clk),
-    .aresetn(i_sys_rst_n),
-
-    // generate packets from preparser
-    .pktin_data            (o_dpkt_data)  	 ,
-    .pktin_en              (o_dpkt_data_en)  ,
-    .pkt_in_md             (o_dpkt_meta) 	 ,
-    .pkt_in_md_en          (o_dpkt_meta_en)  ,
-    .pkt_data_alf          (i_dpkt_fifo_alf) ,
-
-    // commands from ctlpkt
-    .cmd_in_wr             (gmii_command_wr	)  ,
-    .cmd_in                (gmii_command	)  ,
-    .cmd_in_alf            (gmii_command_alf)  ,
-
-    // commands to result2ctl
-    .cmd_out_wr            (gmii_result_wr  )  ,       //command write signal
-    .cmd_out               (gmii_result     )  ,       //command [63:61] 101:frist 111:middle 110:end 100:frist&end [60]1:succeed 0:fail  [59] 0:read 1:write [58:52]MDID [51:32] address [31:0] data
-    .cmd_out_alf           ()  ,
-
-    // generate packets to MUX
-    .pkt_out_data          (pkt_out_data)		 ,
-    .pkt_out_en            (pkt_out_en) 		 ,
-    .pkt_out_md            (pkt_out_md) 		 ,
-    .pkt_out_md_en         (pkt_out_md_en)  	 ,
-    .pkt_out_data_alf      (pkt_out_data_alf)    ,
-
-
-    // AXI signal TO/FROM axi_interconnect_0
-    .S00_AXI_ARESET_OUT_N   ()    ,    // S00 for monitor
-    .S01_AXI_ARESET_OUT_N   ()    ,    // S01 for camera
-    .S02_AXI_ARESET_OUT_N   ()    ,    // S02 for accelerator
-    .S03_AXI_ARESET_OUT_N   ()    ,    // S03 for accelerator
-    .M00_AXI_ARESET_OUT_N   ()    ,
-
-    .M00_AXI_ACLK           (i_sys_clk)      ,          
-
-    .M00_AXI_AWID           (M_AXI_AWID)  	  ,
-    .M00_AXI_AWADDR         (M_AXI_AWADDR)    ,
-    .M00_AXI_AWLEN          (M_AXI_AWLEN)  	  ,
-    .M00_AXI_AWSIZE         (M_AXI_AWSIZE)    ,
-    .M00_AXI_AWBURST        (M_AXI_AWBURST)   ,
-    .M00_AXI_AWLOCK         (M_AXI_AWLOCK)    ,
-    .M00_AXI_AWCACHE        (M_AXI_AWCACHE)   ,
-    .M00_AXI_AWPROT         (M_AXI_AWPROT)    ,
-    .M00_AXI_AWQOS          (M_AXI_AWQOS)     ,
-    .M00_AXI_AWVALID        (M_AXI_AWVALID)   ,
-    .M00_AXI_AWREADY        (M_AXI_AWREADY)   ,
-
-    .M00_AXI_WDATA          (M_AXI_WDATA)    ,
-    .M00_AXI_WSTRB          (M_AXI_WSTRB)    ,
-    .M00_AXI_WLAST          (M_AXI_WLAST)    ,
-    .M00_AXI_WVALID         (M_AXI_WVALID)   ,
-    .M00_AXI_WREADY         (M_AXI_WREADY)   ,
-
-    .M00_AXI_BID            (M_AXI_BID)      ,
-    .M00_AXI_BRESP          (M_AXI_BRESP)    ,
-    .M00_AXI_BVALID         (M_AXI_BVALID)   ,
-    .M00_AXI_BREADY         (M_AXI_BREADY)   ,
-
-    .M00_AXI_ARID           (M_AXI_ARID)     ,
-    .M00_AXI_ARADDR         (M_AXI_ARADDR)   ,
-    .M00_AXI_ARLEN          (M_AXI_ARLEN)    ,
-    .M00_AXI_ARSIZE         (M_AXI_ARSIZE)   ,
-    .M00_AXI_ARBURST        (M_AXI_ARBURST)  ,
-    .M00_AXI_ARLOCK         (M_AXI_ARLOCK)   ,
-    .M00_AXI_ARCACHE        (M_AXI_ARCACHE)  ,
-    .M00_AXI_ARPROT         (M_AXI_ARPROT)   ,
-    .M00_AXI_ARQOS          (M_AXI_ARQOS)    ,
-    .M00_AXI_ARVALID        (M_AXI_ARVALID)  ,
-    .M00_AXI_ARREADY        (M_AXI_ARREADY)  ,
-
-    .M00_AXI_RID            (M_AXI_RID)      ,
-    .M00_AXI_RDATA          (M_AXI_RDATA)    ,
-    .M00_AXI_RRESP          (M_AXI_RRESP)    ,
-    .M00_AXI_RLAST          (M_AXI_RLAST)    ,
-    .M00_AXI_RVALID         (M_AXI_RVALID)   ,
-    .M00_AXI_RREAD          (M_AXI_RREADY)    
-);
 
 	
 	wire	[519:0]				IFE_ctrlpkt_out			;
@@ -618,8 +316,6 @@ CTRLPKT2COMMAND	CTRLPKT2COMMAND_inst(
 	.com_out_cnt				(command_out_cnt				)//command out cnt
 );
 	
-
-
 RESULT2CTRLPKT	RESULT2CTRLPKT_inst(
 //=========================================== clk & rst ===========================================//
 	.Clk						(i_sys_clk						),//clock, this is synchronous clock
@@ -631,9 +327,13 @@ RESULT2CTRLPKT	RESULT2CTRLPKT_inst(
 	.IFE_ctrlpkt_out_valid_wr	(IFE_ctrlpkt_out_valid_wr		),//receive metadata write signal 
 	.IFE_ctrlpkt_in_alf			(IFE_ctrlpkt_in_alf				),//output allmostfull
 //======================================= command to the config path ==================================//
-	.Result_wr					(gmii_result_wr					),//command write signal
-	.Result						(gmii_result					),
-
+	.Result_wr					(gmii_command_wr				),//command write signal
+//================================ sequence of command to Result2ctrlpkt ================================//
+	.IFE_ctrlpkt_in				(o_cpkt_data       				),//receive pkt
+	.IFE_ctrlpkt_in_wr			(o_cpkt_data_en    				),//receive pkt write singal
+	.IFE_ctrlpkt_in_valid		(o_cpkt_meta       				),//receive metadata
+	.IFE_ctrlpkt_in_valid_wr	(o_cpkt_meta_en    				),//receive metadata write signal 
+	.IFE_ctrlpkt_out_alf		(i_cpkt_fifo_alf   				),//output allmostfull
 //=================================== counter & debug ====================================//
 	.pkt_out_cnt				(result_pkt_in_cnt				),//pkt output cnt
 	.result_in_cnt				(result_out_cnt					)//result in cnt	
@@ -658,23 +358,23 @@ POLL_MUX4 POLL_MUX4_inst
 ,.i_ari_0_info_en             	(IFE_ctrlpkt_out_valid_wr		)//info enable
 ,.o_ari_0_fifo_alf            	(IFE_ctrlpkt_in_alf				)//fifo almostfull
 
-,.i_ari_1_data                 	(pkt_out_data    				)//[519:518]:10 head \ 00 body \ 01 tail\,[517:512]:invalid bytes,[511:0],data
-,.i_ari_1_data_en              	(pkt_out_en 					)//data enable
-,.i_ari_1_info                 	(pkt_out_md    					)//[111]:pkt valid,[110]:rev,[109:96]:PL,[95:32]:TSM,[31:0]:InportBM
-,.i_ari_1_info_en              	(pkt_out_md_en 					)//info enable
-,.o_ari_1_fifo_alf             	(pkt_out_data_alf				)//fifo almostfull
+,.i_ari_1_data                 	(o_dpkt_data    				)//[519:518]:10 head \ 00 body \ 01 tail\,[517:512]:invalid bytes,[511:0],data
+,.i_ari_1_data_en              	(o_dpkt_data_en 				)//data enable
+,.i_ari_1_info                 	(o_dpkt_meta    				)//[111]:pkt valid,[110]:rev,[109:96]:PL,[95:32]:TSM,[31:0]:InportBM
+,.i_ari_1_info_en              	(o_dpkt_meta_en 				)//info enable
+,.o_ari_1_fifo_alf             	(i_dpkt_fifo_alf				)//fifo almostfull
 
 ,.i_ari_2_data                 	(520'b0				)//[519:518]:10 head \ 00 body \ 01 tail\,[517:512]:invalid bytes,[511:0],data
 ,.i_ari_2_data_en              	(1'b0				)//data enable
 ,.i_ari_2_info                 	(112'b0				)//[111]:pkt valid,[110]:rev,[109:96]:PL,[95:32]:TSM,[31:0]:InportBM
 ,.i_ari_2_info_en              	(1'b0				)//info enable
-,.o_ari_2_fifo_alf             	(1'b0				)//fifo almostfull
+,.o_ari_2_fifo_alf             	(					)//fifo almostfull
 
 ,.i_ari_3_data                	(520'b0				)//[519:518]:10 head \ 00 body \ 01 tail\,[517:512]:invalid bytes,[511:0],data
 ,.i_ari_3_data_en				(1'b0				)//data enable
 ,.i_ari_3_info					(112'b0				)//[111]:pkt valid,[110]:rev,[109:96]:PL,[95:32]:TSM,[31:0]:InportBM
 ,.i_ari_3_info_en				(1'b0				)//info enable
-,.o_ari_3_fifo_alf				(1'b0				)//fifo almostfull
+,.o_ari_3_fifo_alf				(					)//fifo almostfull
 
 //=========================================== Output ARI  ==========================================//
 ,.o_ari_data                	(TF_512to8_in			)//[519:518]:10 head \ 00 body \ 01 tail\,[517:512]:invalid bytes,[511:0],data

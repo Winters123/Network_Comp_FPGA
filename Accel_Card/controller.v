@@ -65,6 +65,7 @@ always @(posedge clk or negedge aresetn) begin
         cmd_in_alf <= 1'b1;
         cmd_out_wr <= 1'b0;
         cmd_out <= 64'b0;
+        ctrl_state <= 0;
 
         odd_even_flag <= 1'b0;
     end
