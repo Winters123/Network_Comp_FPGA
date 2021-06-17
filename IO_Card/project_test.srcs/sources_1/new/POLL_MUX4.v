@@ -603,80 +603,45 @@ assign  w_ari_info_en[1]    =   i_ari_1_info_en     ;
 assign  w_ari_info_en[2]    =   i_ari_2_info_en     ;
 assign  w_ari_info_en[3]    =   i_ari_3_info_en     ;
 
-wire		[3:0]		w_data_e1a      			;           //active-high,one bit or two bit error is detected(ECC)
-wire		[3:0]		w_data_e2a      			;           //active-high,two or more bit error is detected(ECC)
-
-wire		[3:0]		w_info_e1a      			;           //active-high,one bit or two bit error is detected(ECC)
-wire		[3:0]		w_info_e2a      			;           //active-high,two or more bit error is detected(ECC)
-
-always @(posedge i_sys_clk or negedge i_sys_rst_n)begin
-    if(!i_sys_rst_n) begin
-        e1a   <=  8'b0            ;
-        e2a   <=  8'b0            ;
-    end
-    else begin
-        e1a[0]    <=  w_data_e1a[0]   ?   1'b1    :   e1a[0];
-        e1a[1]    <=  w_data_e1a[1]   ?   1'b1    :   e1a[1];
-        e1a[2]    <=  w_data_e1a[2]   ?   1'b1    :   e1a[2];
-        e1a[3]    <=  w_data_e1a[3]   ?   1'b1    :   e1a[3];
-        e1a[4]    <=  w_info_e1a[0]   ?   1'b1    :   e1a[4];
-        e1a[5]    <=  w_info_e1a[1]   ?   1'b1    :   e1a[5];
-        e1a[6]    <=  w_info_e1a[2]   ?   1'b1    :   e1a[6];
-        e1a[7]    <=  w_info_e1a[3]   ?   1'b1    :   e1a[7];
-
-        e2a[0]    <=  w_data_e2a[0]   ?   1'b1    :   e2a[0];
-        e2a[1]    <=  w_data_e2a[1]   ?   1'b1    :   e2a[1];
-        e2a[2]    <=  w_data_e2a[2]   ?   1'b1    :   e2a[2];
-        e2a[3]    <=  w_data_e2a[3]   ?   1'b1    :   e2a[3];
-        e2a[4]    <=  w_info_e2a[0]   ?   1'b1    :   e2a[4];
-        e2a[5]    <=  w_info_e2a[1]   ?   1'b1    :   e2a[5];
-        e2a[6]    <=  w_info_e2a[2]   ?   1'b1    :   e2a[6];
-        e2a[7]    <=  w_info_e2a[3]   ?   1'b1    :   e2a[7];
-    end
-end
 
 genvar i;
-generate for(i = 0; i<=3; i = i + 1) begin:ARI_FIFO_GROUP
+assign w_ari_data_q[2] = 520'd0;
+assign w_ari_data_q[3] = 520'd0;
+assign w_ari_data_rdempty[2] = 'b1;
+assign w_ari_data_rdempty[3] = 'b1;
+assign w_ari_data_wrusedw[2] = 'd0;
+assign w_ari_data_wrusedw[3] = 'd0;
+assign w_ari_info_q[2] = 112'd0;
+assign w_ari_info_q[3] = 112'd0;
+assign w_ari_info_rdempty[2] = 'b1;
+assign w_ari_info_rdempty[3] = 'b1;
+assign w_ari_info_rdalempty[2] = 'b1;
+assign w_ari_info_rdalempty[3] = 'b1;
+assign w_ari_info_wrusedw[2] = 'd0;
+assign w_ari_info_wrusedw[3] ='d0;
+
+generate for(i = 0; i<=1; i = i + 1) begin:ARI_FIFO_GROUP
 SYNCFIFO_128x520 ari_data_fifo(
-			.e1a                (w_data_e1a[i]                  ),
-			.e2a                (w_data_e2a[i]                  ),
-			.aclr				(~i_sys_rst_n					),
-			.data				(w_ari_data[i]					),
-			.rdreq				(r_ari_data_rd[i]				),
-			.clk				(i_sys_clk						),
-			.wrreq				(w_ari_data_en[i]				),
-			.q					(w_ari_data_q[i]				),
-            .wrfull             (                               ),
-	        .wralfull           (                               ),
-	        .wrempty            (                               ),
-	        .wralempty          (                               ),
-	        .rdfull             (                               ),
-	        .rdalfull           (                               ),
-			.rdempty			(w_ari_data_rdempty[i]          ),
-			.rdalempty          (							    ),
-			.wrusedw			(w_ari_data_wrusedw[i]          ),
-			.rdusedw			(							    )
+			.rst					(~i_sys_rst_n					),
+			.din					(w_ari_data[i]					),
+			.rd_en					(r_ari_data_rd[i]				),
+			.clk					(i_sys_clk						),
+			.wr_en					(w_ari_data_en[i]				),
+			.dout					(w_ari_data_q[i]				),
+			.empty					(w_ari_data_rdempty[i]          ),
+			.data_count				(w_ari_data_wrusedw[i]          )
 );
 
 SYNCFIFO_128x112 ari_info_fifo(
-			.e1a                (w_info_e1a[i]                  ),
-			.e2a        		(w_info_e2a[i]                  ),
-			.aclr				(~i_sys_rst_n					),
-			.data				(w_ari_info[i]					),
-			.rdreq				(r_ari_info_rd[i]				),
-			.clk				(i_sys_clk						),
-			.wrreq				(w_ari_info_en[i]				),
-			.q					(w_ari_info_q[i]				),
-            .wrfull             (                               ),
-	        .wralfull           (                               ),
-	        .wrempty            (                               ),
-	        .wralempty          (                               ),
-	        .rdfull             (                               ),
-	        .rdalfull           (                               ),
-			.rdempty			(w_ari_info_rdempty[i]          ),
-            .rdalempty			(w_ari_info_rdalempty[i]		),
-			.wrusedw			(w_ari_info_wrusedw[i]          ),
-			.rdusedw			(                               )
+			.rst					(~i_sys_rst_n					),
+			.din					(w_ari_info[i]					),
+			.rd_en					(r_ari_info_rd[i]				),
+			.clk					(i_sys_clk						),
+			.wr_en					(w_ari_info_en[i]				),
+			.dout					(w_ari_info_q[i]				),
+			.empty					(w_ari_info_rdempty[i]          ),
+            .almost_empty			(w_ari_info_rdalempty[i]		),
+			.data_count				(w_ari_info_wrusedw[i]          )
 );
 end
 endgenerate
