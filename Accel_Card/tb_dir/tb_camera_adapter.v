@@ -210,9 +210,7 @@ initial begin
 
 end
 
-camera_adaptor #(
-    .SRC_MAC()
-)uut(
+camera_adaptor uut(
     // Reset, Clock
     .aresetn(aresetn),
     .clk(clk),

@@ -15,7 +15,12 @@ module chip
   wire aresetn;
   
 
-  tb_monitor_adapter tb_monitor
+  // tb_monitor_adapter tb_monitor
+  //      (
+  //      .clk(aclk),
+  //      .aresetn(aresetn)
+  //      );
+  tb_controller tb_controller
        (
        .clk(aclk),
        .aresetn(aresetn)

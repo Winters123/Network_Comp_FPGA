@@ -136,11 +136,26 @@ localparam DATA_TYPE = 16'h9000;
 localparam IDLE_S1 = 4'd0,
            COLLECT_S1 = 4'd1;
 
+reg ddr_read_start_flag;
+
 always @(posedge clk or negedge aresetn) begin
     if(~aresetn) begin
-        ddr_read_start_ready <= 1'b1;
-        ddr_read_finish_valid <= 1'b0;
-        ddr_read_finish <= 1'b0;
+        ddr_read_start_flag <= 1'b0;
+    end
+    else begin
+        if(ddr_read_start_valid) begin
+            ddr_read_start_flag <= 1'b1;
+        end
+
+        else if(ddr_read_finish) begin
+            ddr_read_start_flag <= 1'b0;
+        end
+    end
+end
+
+always @(posedge clk or negedge aresetn) begin
+    if(~aresetn) begin
+
 
         fifo_rd_en_2 <= 1'b0;
         pkt_segment <= 520'b0;
@@ -157,7 +172,7 @@ always @(posedge clk or negedge aresetn) begin
                 pkt_out_md_en_r <= 1'b0;
                 pkt_out_md_r <= 256'b0;
                 //start generating packets
-                if(ddr_read_start_ready & ddr_read_start_valid & ddr_read_start & (~fifo_empty_2)) begin
+                if(ddr_read_start_ready & ddr_read_start_flag & (~fifo_empty_2)) begin
                     //start generate pkt hdr
                     pkt_out_data_r[519 -:  2] <= 2'b10;
                     pkt_out_data_r[517 -:  6] <= 6'b0; 
@@ -301,12 +316,16 @@ always @(posedge clk or negedge aresetn) begin
         axi_rnd_cnt <= 0;
         axi_burst_cnt <= 0;
         fifo_write_state <= IDLE_S2;
+
+        ddr_read_start_ready <= 1'b1;
+        ddr_read_finish_valid <= 1'b1;
+        ddr_read_finish <= 1'b1;
     end
     else begin
         case(fifo_write_state)
             IDLE_S2: begin
                 //TODO add almost full for fifo
-                if(ddr_read_start && ddr_read_start_valid && ddr_read_start_ready && !fifo_full_1) begin
+                if(ddr_read_start_flag && ddr_read_start_ready && !fifo_full_1) begin
                     //start read
                     axi_burst_cnt <= axi_burst_cnt + 14'b1;
                     ddr_read_arvalid <= 1'b1;
@@ -316,6 +335,9 @@ always @(posedge clk or negedge aresetn) begin
 
                     fifo_wr_en_1 <= 1'b0;
                     fifo_write_state <= WAIT_S2;
+
+                    ddr_read_finish <= 1'b0;
+                    ddr_read_finish_valid <= 1'b0;
                 end
                 else begin
                     ddr_read_arvalid <= 1'b0;
@@ -341,7 +363,12 @@ always @(posedge clk or negedge aresetn) begin
                         fifo_wr_en_1 <= 1'b1;
                         fifo_data_in_1 <= M_AXI_RDATA;
                         //if this is the final burst of the frame
-                        if(axi_burst_cnt == 14'd9599) begin
+                        //todo: change it to 14'd9599
+                        if(axi_burst_cnt == 14'd3) begin
+                            //todo: set read_finish high here:
+                            ddr_read_finish <= 1'b1;
+                            ddr_read_finish_valid <= 1'b1;
+
                             axi_rnd_cnt <= 4'b0;
                             axi_burst_cnt <= 14'b0;
                             fifo_write_state <= IDLE_S2;
@@ -474,6 +501,8 @@ always @(posedge clk or negedge aresetn) begin
 
 end
 
+
+//TODO: this might cause halt if its the last packet
 fifo_777w_32d pkt_fifo (
   .clk(clk),                  // input wire clk
   .srst(~aresetn),                // input wire srst
