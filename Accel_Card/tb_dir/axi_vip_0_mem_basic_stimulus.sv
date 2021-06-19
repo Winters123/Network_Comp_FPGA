@@ -36,9 +36,10 @@ module axi_vip_0_mem_basic_stimulus(
     * "Xilinx AXI VIP Found at Path: my_ip_exdes_tb.DUT.ex_design.axi_vip_mst.inst" will be printed 
     * out. Pass this path to the new function. 
     ***********************************************************************************************/
-    agent = new("slave vip mem agent",DUT.tb_monitor.axi_ddr_demo.inst.IF); // agent is newed
+    agent = new("slave vip mem agent",DUT.tb_controller.axi_ddr_demo.inst.IF); // agent is newed
     agent.start_slave();                                                  //  agent starts to run
-
+    
+   
   end
 
 endmodule

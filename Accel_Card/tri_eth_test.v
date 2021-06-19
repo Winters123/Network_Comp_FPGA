@@ -112,11 +112,7 @@ wire 				sys_clk_i       ;
 
 clk_wiz_0  clk_wiz_0(
  // Clock out ports
-.clk_out1(usr_clk		),//125Mhz
-//.clk_out2(config_clk	),
-.clk_out3(Port_clk		),//125Mhz
-.clk_out2(GMII_ref_clk	),//200Mhz
- // Status and control signals
+.clk_out1(GMII_ref_clk		),//125Mhz
 .reset(!FPGA_RESET_N),
 .locked(locked),
 // Clock in ports

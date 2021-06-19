@@ -263,7 +263,7 @@ controller controller_uut(
     .aresetn(aresetn),
 
     //from outside
-    .start_all(start_all),
+    .start_all(1'b1),
 
     //TO MONITOR
     .ddr_read_start(ddr_read_start),

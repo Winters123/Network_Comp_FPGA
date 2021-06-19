@@ -511,7 +511,7 @@ wire			pkt_out_data_alf			;
 
 
 
-curr_top_adapter curr_top(
+cur_top_pt curr_top(
     .clk(i_sys_clk),
     .aresetn(i_sys_rst_n),
 
