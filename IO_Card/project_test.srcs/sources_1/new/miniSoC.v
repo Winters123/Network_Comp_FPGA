@@ -277,6 +277,8 @@ PREPARSE PREPARSE
 //system clock & resets
   .i_sys_clk                 	(i_sys_clk_IBUFG					)//system clk
  ,.i_sys_rst_n               	(i_sys_rst_n				)//rst of sys_clk
+ ,.rd_sys_clk                   (i_sys_clk_IBUFG            )
+ ,.rd_sys_rst_n                 (i_sys_rst_n                )
 //=========================================== Input ARI  ==========================================//
 
 //input pkt data form application(ARI)
