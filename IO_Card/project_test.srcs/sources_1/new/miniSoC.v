@@ -108,25 +108,6 @@ wire                       rx_axis_tuser;
     wire rgmii_rxc_90;
 
 
-
-// ila_0 your_instance_name (
-// 	.clk(i_sys_clk_IBUFG), // input wire clk
-
-
-// 	.probe0(rx_axis_tlast), // input wire [0:0]  probe0  //这个是进来的512位数据使能信号，然后进行分派
-// 	.probe1(rx_axis_tdata), // input wire [0:0]  probe1   // 这个是分派给显示器的数据使能
-//     .probe2(TF_8to512_out_wr),
-//     .probe3(o_cpkt_data_en),
-//     .probe4(o_dpkt_data_en),
-//     .probe5(gmii_command_wr),
-//     .probe6(Command_wr_o),
-//     .probe7(IFE_ctrlpkt_out_wr_0),
-//     .probe8(TF_512to8_in_wr),
-//     .probe9(TF_512to8_in_valid_wr),
-//     .probe10(tx_axis_tvalid),
-//     .probe11(tx_axis_tlast)
-
-// );
   pll_90_degree pll_90_degree_i0
    (
     // Clock out ports
@@ -165,8 +146,8 @@ eth_mac_1g_rgmii_fifo #
     // .RX_FIFO_DEPTH(),
     // .RX_FIFO_PIPELINE_OUTPUT(),
     .RX_FRAME_FIFO(1),
-    .RX_DROP_BAD_FRAME(1),
-    .RX_DROP_WHEN_FULL(1)
+    .RX_DROP_BAD_FRAME(0),
+    .RX_DROP_WHEN_FULL(0)
 )rgmii_mac_1g
 (
     .gtx_clk(rgmii_rxc),  //use 125Mhz    //use received 125M clk
@@ -181,7 +162,7 @@ eth_mac_1g_rgmii_fifo #
     .tx_axis_tdata(tx_axis_tdata),
     .tx_axis_tkeep('b0),      // 这个tkeep信号是输入，没有接信号
     .tx_axis_tvalid(tx_axis_tvalid),
-    .tx_axis_tready(tx_axis_tready),        // output not wired
+    .tx_axis_tready(tx_axis_tready),
     .tx_axis_tlast(tx_axis_tlast),
     .tx_axis_tuser(tx_axis_tuser),
 
@@ -222,7 +203,7 @@ eth_mac_1g_rgmii_fifo #
     /*
      * Configuration
      */
-    .ifg_delay('d0)
+    .ifg_delay('d12)        // 保证最短帧间间隔
     ,.e_mdc(e_mdc)
     ,.e_mdio(e_mdio)
 );
@@ -277,10 +258,9 @@ PREPARSE PREPARSE
 //system clock & resets
   .i_sys_clk                 	(i_sys_clk_IBUFG					)//system clk
  ,.i_sys_rst_n               	(i_sys_rst_n				)//rst of sys_clk
- ,.rd_sys_clk                   (i_sys_clk_IBUFG            )
- ,.rd_sys_rst_n                 (i_sys_rst_n                )
 //=========================================== Input ARI  ==========================================//
-
+,.rd_sys_clk                    (i_sys_clk_IBUFG            )
+,.rd_sys_rst_n                  (i_sys_rst_n                )
 //input pkt data form application(ARI)
 ,.i_ari_data                   	(TF_8to512_out				)//[519:518]:10 head \ 00 body \ 01 tail\,[517:512]:invalid bytes,[511:0],data
 ,.i_ari_data_en                	(TF_8to512_out_wr			)//data enable
@@ -295,8 +275,8 @@ PREPARSE PREPARSE
 //=========================================== Output data pkt  ==========================================//
 ,.o_dpkt_data                 	(o_dpkt_data    	)//[519:518]:10 head \ 00 body \ 01 tail\,[517:512]:invalid bytes,[511:0],data
 ,.o_dpkt_data_en              	(o_dpkt_data_en 	)//data enable
-,.o_dpkt_meta                 	(    	)//metadata
-,.o_dpkt_meta_en              	( 	)//meta enable
+,.o_dpkt_meta                 	(    	            )//metadata
+,.o_dpkt_meta_en              	( 	                )//meta enable
 ,.i_dpkt_fifo_alf             	(i_dpkt_fifo_alf	)//fifo almostfull
 
 //=========================================== Output control pkt  ==========================================//
@@ -393,18 +373,28 @@ RESULT2CTRLPKT	RESULT2CTRLPKT_inst(
 	.IFE_ctrlpkt_out_valid_wr	(IFE_ctrlpkt_out_valid_wr_1		),//receive metadata write signal 
 	.IFE_ctrlpkt_in_alf			(IFE_ctrlpkt_in_alf_1				),//output allmostfull
 //======================================= command to the config path ==================================//
-	.Result_wr					(Command_wr_o			),//command write signal
+	.Result_wr					(	1'b0		),//command write signal // Command_wr_o
 //================================ sequence of command to Result2ctrlpkt ================================//
-	.IFE_ctrlpkt_in				(o_cpkt_data       				),//input [519:0]receive pkt
-	.IFE_ctrlpkt_in_wr			(o_cpkt_data_en    				),//receive pkt write singal
-	.IFE_ctrlpkt_in_valid		(o_cpkt_meta       				),//input [255:0] receive metadata
-	.IFE_ctrlpkt_in_valid_wr	(o_cpkt_meta_en  				),//receive metadata write signal 
+	// .IFE_ctrlpkt_in				(o_cpkt_data       				),//input [519:0]receive pkt
+	// .IFE_ctrlpkt_in_wr			(o_cpkt_data_en    				),//receive pkt write singal
+	// .IFE_ctrlpkt_in_valid		(o_cpkt_meta       				),//input [255:0] receive metadata
+	// .IFE_ctrlpkt_in_valid_wr	(o_cpkt_meta_en  				),//receive metadata write signal 
+	// .IFE_ctrlpkt_out_alf		(i_cpkt_fifo_alf   				),//output allmostfull
+
+    .IFE_ctrlpkt_in				(520'd0       				),//input [519:0]receive pkt
+	.IFE_ctrlpkt_in_wr			('d0    				),//receive pkt write singal
+	.IFE_ctrlpkt_in_valid		(256'd0       				),//input [255:0] receive metadata
+	.IFE_ctrlpkt_in_valid_wr	('d0  				),//receive metadata write signal 
 	.IFE_ctrlpkt_out_alf		(i_cpkt_fifo_alf   				),//output allmostfull
 //=================================== counter & debug ====================================//
 	.pkt_out_cnt				(result_pkt_in_cnt				),//pkt output cnt
 	.result_in_cnt				(result_out_cnt					)//result in cnt	
 );
 
+wire [111:0] i_ari_0_info;
+assign i_ari_0_info = { 1'b1, 1'b0, 14'b00_0100_0100_0000,96'd0};//1+1+14+96=112
+                                                // PL = 17*512/8=1088字节
+wire o_ari_0_fifo_alf;
 POLL_MUX4 POLL_MUX4_inst
 (
     
@@ -417,14 +407,14 @@ POLL_MUX4 POLL_MUX4_inst
 //=========================================== Input ARI*4  ==========================================//
 
 //input pkt data form ARI
-// 第一个接口是控制的命令报文
+// 第一个接口是摄像头图像数据报文
 ,.i_ari_0_data                	(IFE_ctrlpkt_out_0				)//[519:518]:10 head \ 00 body \ 01 tail\,[517:512]:invalid bytes,[511:0],data
 ,.i_ari_0_data_en             	(IFE_ctrlpkt_out_wr_0				)//data enable
-,.i_ari_0_info                	(112'b0			)//[111]:pkt valid,[110]:rev,[109:96]:PL,[95:32]:TSM,[31:0]:InportBM
+,.i_ari_0_info                	(i_ari_0_info		)//[111]:pkt valid,[110]:rev,[109:96]:PL,[95:32]:TSM,[31:0]:InportBM
 ,.i_ari_0_info_en             	(packet_end		)//info enable
-,.o_ari_0_fifo_alf            	(				)//fifo almostfull
+,.o_ari_0_fifo_alf            	(o_ari_0_fifo_alf				)//fifo almostfull
 //  这里输入的 info 部分是256位的metadata转换成的112位的valid信号。只再最后一个报文处拉高就行。
-// 第二个几口是摄像头图像数据报文
+// 第二个接口是控制的命令报文
 ,.i_ari_1_data                 	(IFE_ctrlpkt_out_1    				)//[519:518]:10 head \ 00 body \ 01 tail\,[517:512]:invalid bytes,[511:0],data
 ,.i_ari_1_data_en              	(IFE_ctrlpkt_out_wr_1 				)//data enable
 ,.i_ari_1_info                 	(IFE_ctrlpkt_out_valid_1    				)//[111]:pkt valid,[110]:rev,[109:96]:PL,[95:32]:TSM,[31:0]:InportBM
@@ -439,20 +429,26 @@ POLL_MUX4 POLL_MUX4_inst
 ,.i_ari_fifo_alf            	(TF_512to8_out_alf		)//fifo almostfull
 );
 
+      wire      [7:0] 		tx_axis_mac_tdata;
+      wire            		tx_axis_mac_tvalid;
+      wire            		tx_axis_mac_tlast;
+      wire            		tx_axis_mac_tuser;
+    wire m_axis_rx_alf;
+
 TF_512to8 TF_512to8_inst(
 	.wr_clk					(i_sys_clk_IBUFG					),
-	.rd_clk					(i_sys_clk_IBUFG				),      // mac的发送时钟
+	.rd_clk					(i_sys_clk_IBUFG				),      // mac的发送时钟,因为MAC做了时钟隔离，所以这里还是使用系统时钟
 	// .rd_clk					(tx_mac_aclk				),
 	.wr_rst_n				(i_sys_rst_n				),
 	.rd_rst_n				(i_sys_rst_n    			),
 	// .rd_rst_n				(~tx_reset					),
 	
-	.s_axis_tx_alf			(				),  //input 
+	.s_axis_tx_alf			(m_axis_rx_alf				),  //input 
 	// .s_axis_tx_alf			(m_axis_rx_alf				),
-	.s_axis_tx_tdata		(tx_axis_tdata			),
-	.s_axis_tx_tlast		(tx_axis_tlast			),
-	.s_axis_tx_tuser		(tx_axis_tuser			),
-	.s_axis_tx_tvalid		(tx_axis_tvalid			),
+	.s_axis_tx_tdata		(tx_axis_mac_tdata			),
+	.s_axis_tx_tlast		(tx_axis_mac_tlast			),
+	.s_axis_tx_tuser		(tx_axis_mac_tuser			),
+	.s_axis_tx_tvalid		(tx_axis_mac_tvalid			),
 	
 	.TF_512to8_in			(TF_512to8_in				),
 	.TF_512to8_in_wr		(TF_512to8_in_wr			),
@@ -461,8 +457,10 @@ TF_512to8 TF_512to8_inst(
 	.TF_512to8_out_alf		(TF_512to8_out_alf			) 
 );
 
-
-
+assign tx_axis_tdata = tx_axis_mac_tdata;
+assign tx_axis_tlast = tx_axis_mac_tlast;
+assign tx_axis_tuser = tx_axis_mac_tuser;
+assign tx_axis_tvalid = tx_axis_mac_tvalid;
 
 //================ pixel buffer 负责将接收到的图像报文数据存入DDR并进行显示 ==========================================//
 // pixel_buffer Outputs
